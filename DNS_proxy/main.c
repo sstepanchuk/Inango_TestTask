@@ -10,19 +10,6 @@
 #define BUFFER_SIZE 1024
 #define MAX_CLIENTS 1024
 
-// Встановлення сокета в неблокуючий режим
-void set_non_blocking(int fd) {
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1) {
-        perror("fcntl");
-        exit(EXIT_FAILURE);
-    }
-    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-        perror("fcntl");
-        exit(EXIT_FAILURE);
-    }
-}
-
 int main() {
     int sockfd, max_fd, nready;
     struct sockaddr_in server_addr, client_addr;
@@ -31,7 +18,7 @@ int main() {
     fd_set read_fds, all_fds;
 
     // Створення UDP-сокета
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0)) < 0) {
         perror("Не вдалося створити сокет");
         exit(EXIT_FAILURE);
     }
@@ -48,9 +35,6 @@ int main() {
         close(sockfd);
         exit(EXIT_FAILURE);
     }
-
-    // Встановлення неблокуючого режиму
-    set_non_blocking(sockfd);
 
     // Ініціалізація набору файлових дескрипторів
     FD_ZERO(&all_fds);
