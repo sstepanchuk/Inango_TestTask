@@ -81,6 +81,6 @@ void udp_server_listen(UdpServer *server, RequestHandler handler,
                       (void *)rinfo);
       rinfo = NULL;
     }
-  } else if (errno == EAGAIN || errno == EWOULDBLOCK)
+  } else if (errno != EAGAIN && errno != EWOULDBLOCK)
     perror("Помилка recvfrom");
 }
