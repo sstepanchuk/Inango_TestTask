@@ -1,11 +1,4 @@
 {
-    "files.associations": {
-        "inet.h": "c",
-        "thread_pool.h": "c",
-        "udp_server.h": "c",
-        "stdlib.h": "c",
-        "stdio.h": "c",
-        "unistd.h": "c",
-        "thpool.h": "c"
-    }
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2
 }

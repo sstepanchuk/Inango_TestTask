@@ -1,32 +1,35 @@
-#include "thpool.h"
-#include "udp_server.h"
-#include <stdio.h>
+#include "main.h"
 
 // Кастомний обробник запитів
-void custom_request_handler(UdpServer *server, Request request)
-{
-    printf("Обробка запиту від клієнта: %s\n", request.buffer);
-    // Тут можна реалізувати специфічну логіку обробки запиту
+void custom_request_handler(UdpServer *server, Request request,
+                            DnsPacket *packet) {
+  print_dns_packet(packet);
+  free_dns_packet(packet);
 }
 
-int main()
-{
-    // Налаштування серверів (порт, розмір буфера, кількість потоків, розмір черги)
-    int buffer_size = 512;
-    int thread_pool_size = 8;
+// Кастомний валідатор запитів
+void *custom_request_validator(UdpServer *server, Request request) {
+  return parse_dns_packet(request.buffer, request.packet_size);
+}
 
-    threadpool pool = thpool_init(thread_pool_size);
-    UdpServer *server = udp_server_create(8080, buffer_size, 0);
-    if (!server)
-        fprintf(stderr, "Не вдалося створити сервер на порту %d\n", 8080);
+int main() {
+  // Налаштування серверів (порт, розмір буфера, кількість потоків)
+  int port = 8080;
+  int buffer_size = MAX_DNS_PACKET_SIZE;
+  int thread_pool_size = 8;
 
-    while(1) {
-        udp_server_listen(server, custom_request_handler, pool);
-    }
+  threadpool pool = thpool_init(thread_pool_size);
+  UdpServer *server = udp_server_create(port, buffer_size, 0);
+  if (!server)
+    fprintf(stderr, "Не вдалося створити сервер на порту %d\n", port);
 
-    // Не забудьте звільнити ресурси
-    thpool_destroy(pool);
-    udp_server_destroy(server);
+  while (1) {
+    udp_server_listen(server, (RequestHandler)custom_request_handler,
+                      custom_request_validator, pool);
+  }
 
-    return 0;
+  thpool_destroy(pool);
+  udp_server_destroy(server);
+
+  return 0;
 }
