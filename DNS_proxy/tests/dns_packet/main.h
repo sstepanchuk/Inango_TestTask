@@ -7,6 +7,11 @@
 #include <stdlib.h>
 
 // cases
+TCase *test__validate_dns_header(void);
+TCase *test__validate_type(void);
+TCase *test__validate_class(void);
+TCase *test__validate_qtype(void);
+TCase *test__validate_qclass(void);
 TCase *test__parse_domain_name(void);
 
 // suite

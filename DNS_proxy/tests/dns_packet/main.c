@@ -6,6 +6,11 @@ Suite *dns_packet_suite(void) {
   TCase *tc_core;
 
   s = suite_create("dns_packet");
+  suite_add_tcase(s, test__validate_dns_header());
+  suite_add_tcase(s, test__validate_type());
+  suite_add_tcase(s, test__validate_class());
+  suite_add_tcase(s, test__validate_qtype());
+  suite_add_tcase(s, test__validate_qclass());
   suite_add_tcase(s, test__parse_domain_name());
   return s;
 }

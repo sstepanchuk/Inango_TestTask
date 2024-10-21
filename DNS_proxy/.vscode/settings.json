@@ -12,6 +12,7 @@
         "stdlib.h": "c",
         "libcompat.h": "c",
         "check_list.h": "c",
-        "check_pretty_print.h": "c"
+        "check_pretty_print.h": "c",
+        "dns_validation.h": "c"
     }
 }
