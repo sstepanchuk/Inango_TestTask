@@ -32,12 +32,13 @@ typedef struct {
 } ServerRequestInfo;
 
 // Функції для створення і знищення сервера
-UdpServer *udp_server_create(int port, int buffer_size, int sock_type_flags);
+UdpServer *udp_server_create(int port, int buffer_size, int socket_buffer_size,
+                             int sock_type_flags);
 void udp_server_destroy(UdpServer *server);
 
 // Функція для запуску сервера
 void udp_server_listen(UdpServer *server, RequestHandler handler,
                        RequestValidatorHandler validation_handler,
-                       threadpool pool);
+                       threadpool pool, ServerRequestInfo **_rinfo);
 
 #endif

@@ -1,6 +1,10 @@
 #ifndef DNS_DEFS_H
 #define DNS_DEFS_H
 
+#define MAX_DNS_PACKET_SIZE 512
+#define MAX_DOMAIN_LENGTH 253
+#define MAX_LABEL_LENGTH 63
+
 // TYPE values used in DNS resource records (RFC 1035 and beyond)
 #define TYPE_A 0x0001     // Host address (IPv4)
 #define TYPE_NS 0x0002    // Authoritative name server

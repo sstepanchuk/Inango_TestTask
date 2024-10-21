@@ -7,7 +7,8 @@
 #include <unistd.h>
 
 // Функція для створення нового UDP сервера
-UdpServer *udp_server_create(int port, int buffer_size, int sock_type_flags) {
+UdpServer *udp_server_create(int port, int buffer_size, int socket_buffer_size,
+                             int sock_type_flags) {
   UdpServer *server = malloc(sizeof(UdpServer));
   server->port = port;
   server->buffer_size = buffer_size;
@@ -25,6 +26,14 @@ UdpServer *udp_server_create(int port, int buffer_size, int sock_type_flags) {
   server_addr.sin_family = AF_INET;
   server_addr.sin_addr.s_addr = INADDR_ANY;
   server_addr.sin_port = htons(port);
+
+  if (setsockopt(server->sockfd, SOL_SOCKET, SO_RCVBUF, &socket_buffer_size,
+                 sizeof(socket_buffer_size)) < 0) {
+    perror("Не вдалося змінити розмір буфера сокета");
+    close(server->sockfd);
+    free(server);
+    return NULL;
+  }
 
   // Прив'язка сокета до адреси
   if (bind(server->sockfd, (const struct sockaddr *)&server_addr,
@@ -51,14 +60,15 @@ void _udp_server_request_handler(ServerRequestInfo *info) {
 }
 
 // Функція для запуску сервера
-void udp_server_listen(UdpServer *server, RequestHandler handler,
-                       RequestValidatorHandler validation_handler,
-                       threadpool pool) // Можна тільки в одному потоці
+void udp_server_listen(
+    UdpServer *server, RequestHandler handler,
+    RequestValidatorHandler validation_handler, threadpool pool,
+    ServerRequestInfo **_rinfo) // Можна тільки в одному потоці
 {
   // Основний цикл сервера
-  static ServerRequestInfo *rinfo = NULL;
-  static Request *request;
-  static socklen_t addr_len;
+  ServerRequestInfo *rinfo = *_rinfo;
+  Request *request;
+  socklen_t addr_len;
 
   if (rinfo == NULL) {
     rinfo = malloc(sizeof(ServerRequestInfo));

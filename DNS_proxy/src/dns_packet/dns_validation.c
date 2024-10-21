@@ -1,60 +1,54 @@
 #include "dns_packet.h"
 
 int validate_dns_header(DnsHeader *dns_header, int packet_size) {
-  // Перевірка загального розміру пакета
+
   if (packet_size < sizeof(DnsHeader)) {
-    return 0; // Пакет занадто малий
+    return 0;
   }
 
-  // Перевірка зарезервованого біта "z"
   if (dns_header->z != 0) {
-    return 0; // Зарезервований біт повинен бути нульовим
+    return 0;
   }
 
-  // Перевірка флагів (qr, opcode, rcode, тощо)
   if (dns_header->opcode > 15 || dns_header->rcode > 15) {
-    return 0; // Невірний код операції або код відповіді
+    return 0;
   }
 
-  // Перевірка для DNS відповіді
   if (dns_header->qr) {
     if (dns_header->q_count > 0) {
-      return 0; // Відповідь не повинна містити запитів
+      return 0;
     }
 
-    // Перевірка на коректність кількості відповідей та додаткових записів
     if (dns_header->ans_count + dns_header->add_count + dns_header->auth_count >
         ((MAX_DNS_PACKET_SIZE - sizeof(DnsHeader)) / sizeof(DnsAnswer))) {
-      return 0; // Загальна кількість записів перевищує максимальний розмір
-                // пакету
+      return 0;
     }
   }
-  // Перевірка для DNS запиту
+
   else {
     if (dns_header->ans_count > 0 || dns_header->auth_count > 0) {
-      return 0; // Запит не повинен містити відповідей або авторитетних записів
+      return 0;
     }
 
     if (dns_header->q_count == 0) {
-      return 0; // Запит повинен містити хоча б один запит
+      return 0;
     }
 
     if (dns_header->q_count >
         ((MAX_DNS_PACKET_SIZE - sizeof(DnsHeader)) / sizeof(DnsQuestion))) {
-      return 0; // Кількість запитів перевищує допустимий розмір пакета
+      return 0;
     }
   }
 
-  // Перевірка на рекурсію та обрізане повідомлення
   if (dns_header->tc && dns_header->q_count == 0) {
-    return 0; // Обрізане повідомлення не повинно містити 0 запитів
+    return 0;
   }
 
-  return 1; // Заголовок валідний
+  return 1;
 }
 
 int validate_type(unsigned short type) {
-  // Validate type (should be either TYPE or QTYPE)
+
   switch (type) {
   case TYPE_A:
   case TYPE_NS:
@@ -74,27 +68,27 @@ int validate_type(unsigned short type) {
   case TYPE_TXT:
   case TYPE_AAAA:
   case TYPE_SRV:
-    break; // Valid type
+    break;
   default:
-    return 0; // Invalid type
+    return 0;
   }
 
-  return 1; // Both type and class are valid
+  return 1;
 }
 
 int validate_class(unsigned short class) {
-  // Validate class
+
   switch (class) {
   case CLASS_IN:
   case CLASS_CS:
   case CLASS_CH:
   case CLASS_HS:
-    return 1; // Valid class
+    return 1;
   default:
-    return 0; // Invalid class
+    return 0;
   }
 
-  return 1; // Both type and class are valid
+  return 1;
 }
 
 int validate_qtype(unsigned short qtype) {
@@ -108,7 +102,7 @@ int validate_qtype(unsigned short qtype) {
   case QTYPE_ANY:
     return 1;
   default:
-    return 0; // Invalid qtype
+    return 0;
   }
 }
 
@@ -120,6 +114,22 @@ int validate_qclass(unsigned short qclass) {
   case QCLASS_ANY:
     return 1;
   default:
-    return 0; // Invalid qtype
+    return 0;
   }
+}
+
+int is_valid_label(const unsigned char *packet_with_pos, int label_length) {
+  if (!label_length || packet_with_pos[0] == '-' ||
+      packet_with_pos[label_length - 1] == '-') {
+    return 0;
+  }
+
+  for (int i = 0; i < label_length; i++) {
+    char ch = packet_with_pos[i];
+    if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+          (ch >= '0' && ch <= '9') || (ch == '-'))) {
+      return 0;
+    }
+  }
+  return 1;
 }

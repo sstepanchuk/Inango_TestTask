@@ -1,9 +1,6 @@
 #ifndef DNS_PACKET_H
 #define DNS_PACKET_H
 
-// Максимальний розмір DNS пакета (без EDNS)
-#define MAX_DNS_PACKET_SIZE 512
-
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>

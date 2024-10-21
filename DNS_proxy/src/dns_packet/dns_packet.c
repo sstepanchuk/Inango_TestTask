@@ -22,35 +22,50 @@ int parse_dns_header(const unsigned char *packet, int packet_size,
 // Функція для розбору доменного імені з пакета
 int parse_domain_name(const unsigned char *packet, int packet_size, int pos,
                       char **name) {
-  int label_length, name_length = 0;
-  char *parsed_name =
-      malloc(MAX_DNS_PACKET_SIZE - sizeof(DnsHeader) -
-             sizeof(DnsQuestion)); // Виділення пам'яті для доменного імені
+  int label_length;
+  int name_length = 0;
+  int max_length = MAX_DOMAIN_LENGTH + 1; // +1 для нульового байта
 
+  // Виділення початкового буфера для доменного імені
+  char *parsed_name = malloc(max_length);
   if (!parsed_name)
     return -1; // Помилка виділення пам'яті
 
-  while (pos < packet_size &&
-         (label_length = (unsigned char)packet[pos]) != 0) {
-    if (label_length > 63 || pos + label_length + 1 >= packet_size) {
+  while (pos < packet_size) {
+    label_length = (unsigned char)packet[pos];
+    if (label_length == 0)
+      break; // Кінець доменного імені
+
+    // Перевірка на недійсну довжину мітки або перевищення загальної довжини
+    // імені
+    if (label_length > 63 || name_length + label_length >= max_length) {
       free(parsed_name);
-      return -1; // Недійсна довжина мітки або вихід за межі
+      return -1; // Недійсна довжина мітки або перевищена загальна довжина
     }
+
+    // Перевірка, чи мітка не починається або не закінчується дефісом
+    if (packet[pos + 1] == '-' || packet[pos + label_length] == '-' ||
+        !is_valid_label(packet + pos + 1, label_length)) {
+      free(parsed_name);
+      return -1; // Мітка не може починатися або закінчуватися дефісом
+    }
+
+    // Копіюємо мітку у parsed_name
     memcpy(parsed_name + name_length, packet + pos + 1, label_length);
     name_length += label_length;
-    parsed_name[name_length++] = '.'; // Додавання роздільника між мітками
+    parsed_name[name_length++] = '.'; // Додаємо роздільник між мітками
     pos += label_length + 1;
   }
 
-  if (!name_length) {
+  // Видалення останньої крапки та завершення доменного імені нульовим байтом
+  if (name_length > 0) {
+    parsed_name[name_length - 1] = '\0'; // Завершення доменного імені
+  } else {
     free(parsed_name);
     return -1; // Недійсна довжина доменного імені
   }
 
-  parsed_name[name_length - 1] =
-      '\0'; // Завершення доменного імені нульовим байтом
-  *name = parsed_name;
-
+  *name = parsed_name; // Присвоєння розібраного доменного імені
   return (pos + 1); // Повернення позиції після доменного імені
 }
 
