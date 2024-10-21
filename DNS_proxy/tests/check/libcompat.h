@@ -28,47 +28,48 @@
 /**
  * __GNUC_PATCHLEVEL__ is new to GCC 3.0;
  * it is also present in the widely-used development snapshots leading up to 3.0
- * (which identify themselves as GCC 2.96 or 2.97, depending on which snapshot you have).
+ * (which identify themselves as GCC 2.96 or 2.97, depending on which snapshot
+ * you have).
  *
  * https://stackoverflow.com/questions/1936719/what-are-the-gcc-predefined-macros-for-the-compilers-version-number/1936745#1936745
  */
 
 #if defined(__GNUC__) && defined(__GNUC_MINOR__) && defined(__GNUC_PATCHLEVEL__)
-#define GCC_VERSION_AT_LEAST(major, minor, patch) \
-((__GNUC__ > (major)) || \
- (__GNUC__ == (major) && __GNUC_MINOR__ > (minor)) || \
- (__GNUC__ == (major) && __GNUC_MINOR__ == (minor) && __GNUC_PATCHLEVEL__ >= (patch)) )
+#define GCC_VERSION_AT_LEAST(major, minor, patch)                              \
+  ((__GNUC__ > (major)) ||                                                     \
+   (__GNUC__ == (major) && __GNUC_MINOR__ > (minor)) ||                        \
+   (__GNUC__ == (major) && __GNUC_MINOR__ == (minor) &&                        \
+    __GNUC_PATCHLEVEL__ >= (patch)))
 #elif defined(__GNUC__) && defined(__GNUC_MINOR__)
-#define GCC_VERSION_AT_LEAST(major, minor, patch) \
-((__GNUC__ > (major)) || \
- (__GNUC__ == (major) && __GNUC_MINOR__ >= (minor)))
+#define GCC_VERSION_AT_LEAST(major, minor, patch)                              \
+  ((__GNUC__ > (major)) || (__GNUC__ == (major) && __GNUC_MINOR__ >= (minor)))
 #else
 #define GCC_VERSION_AT_LEAST(major, minor, patch) 0
 #endif
 
-#if GCC_VERSION_AT_LEAST(2,95,3)
-#define CK_ATTRIBUTE_UNUSED __attribute__ ((unused))
-#define CK_ATTRIBUTE_FORMAT(a, b, c) __attribute__ ((format (a, b, c)))
+#if GCC_VERSION_AT_LEAST(2, 95, 3)
+#define CK_ATTRIBUTE_UNUSED __attribute__((unused))
+#define CK_ATTRIBUTE_FORMAT(a, b, c) __attribute__((format(a, b, c)))
 #else
 #define CK_ATTRIBUTE_UNUSED
 #define CK_ATTRIBUTE_FORMAT(a, b, c)
 #endif /* GCC 2.95 */
 
-#if GCC_VERSION_AT_LEAST(2,5,0)
-#define CK_ATTRIBUTE_NORETURN __attribute__ ((noreturn))
+#if GCC_VERSION_AT_LEAST(2, 5, 0)
+#define CK_ATTRIBUTE_NORETURN __attribute__((noreturn))
 #else
 #define CK_ATTRIBUTE_NORETURN
 #endif /* GCC 2.5 */
 
-#if GCC_VERSION_AT_LEAST(4,7,4) && (__STDC_VERSION__ >= 199901L)
+#if GCC_VERSION_AT_LEAST(4, 7, 4) && (__STDC_VERSION__ >= 199901L)
 /* Operator _Pragma introduced in C99 */
 #define CK_DIAGNOSTIC_STRINGIFY(x) #x
-#define CK_DIAGNOSTIC_HELPER1(y) CK_DIAGNOSTIC_STRINGIFY(GCC diagnostic ignored y)
+#define CK_DIAGNOSTIC_HELPER1(y)                                               \
+  CK_DIAGNOSTIC_STRINGIFY(GCC diagnostic ignored y)
 #define CK_DIAGNOSTIC_HELPER2(z) CK_DIAGNOSTIC_HELPER1(#z)
-#define CK_DIAGNOSTIC_PUSH_IGNORE(w) \
-    _Pragma("GCC diagnostic push") \
-    _Pragma(CK_DIAGNOSTIC_HELPER2(w))
-#define CK_DIAGNOSTIC_POP(w) _Pragma ("GCC diagnostic pop")
+#define CK_DIAGNOSTIC_PUSH_IGNORE(w)                                           \
+  _Pragma("GCC diagnostic push") _Pragma(CK_DIAGNOSTIC_HELPER2(w))
+#define CK_DIAGNOSTIC_POP(w) _Pragma("GCC diagnostic pop")
 #else
 #define CK_DIAGNOSTIC_PUSH_IGNORE(w)
 #define CK_DIAGNOSTIC_POP(w)
@@ -84,10 +85,10 @@
 #endif
 
 #if defined(_MSC_VER)
-#include <WinSock2.h>           /* struct timeval, API used in gettimeofday implementation */
-#include <io.h>                 /* read, write */
-#include <process.h>            /* getpid */
-#endif /* _MSC_VER */
+#include <WinSock2.h> /* struct timeval, API used in gettimeofday implementation */
+#include <io.h>       /* read, write */
+#include <process.h> /* getpid */
+#endif               /* _MSC_VER */
 
 /*
  * On some not so old version of Visual Studio (< 2015), or with mingw-w64 not
@@ -124,8 +125,8 @@
 /* However, some older Visual Studio Versions do not */
 #if !defined(INFINITY) || !defined(NAN)
 extern double DOUBLE_ZERO;
-#define INFINITY (1.0/DOUBLE_ZERO)
-#define NAN (DOUBLE_ZERO/DOUBLE_ZERO)
+#define INFINITY (1.0 / DOUBLE_ZERO)
+#define NAN (DOUBLE_ZERO / DOUBLE_ZERO)
 #endif
 #if !defined(isnan) || !defined(isinf) || !defined(isfinite)
 #define NEED_fpclassify
@@ -137,9 +138,8 @@ extern int fpclassify(double d);
 #define FP_SUBNORMAL (16)
 #define isnan(x) ((fpclassify((double)(x)) & FP_NAN) == FP_NAN)
 #define isinf(x) ((fpclassify((double)(x)) & FP_INFINITE) == FP_INFINITE)
-#define isfinite(x) ((fpclassify((double)(x)) & (FP_NAN|FP_INFINITE)) == 0)
+#define isfinite(x) ((fpclassify((double)(x)) & (FP_NAN | FP_INFINITE)) == 0)
 #endif
-
 
 /* provides localtime and struct tm */
 #ifdef HAVE_SYS_TIME_H
@@ -169,16 +169,13 @@ extern int fpclassify(double d);
 #elif defined HAVE_WIN32_INIT_ONCE
 typedef void pthread_mutexattr_t;
 
-typedef struct
-{
-    INIT_ONCE init;
-    HANDLE mutex;
+typedef struct {
+  INIT_ONCE init;
+  HANDLE mutex;
 } pthread_mutex_t;
 
-#define PTHREAD_MUTEX_INITIALIZER { \
-    INIT_ONCE_STATIC_INIT, \
-    NULL, \
-}
+#define PTHREAD_MUTEX_INITIALIZER                                              \
+  { INIT_ONCE_STATIC_INIT, NULL, }
 
 int pthread_mutex_init(pthread_mutex_t *mutex, pthread_mutexattr_t *attr);
 int pthread_mutex_destroy(pthread_mutex_t *mutex);
@@ -207,13 +204,9 @@ CK_DLL_EXP void *rpl_realloc(void *p, size_t n);
 #define getpid _getpid
 #endif /* !HAVE_GETPID && HAVE__GETPID */
 
-#if !HAVE_GETTIMEOFDAY
-CK_DLL_EXP int gettimeofday(struct timeval *tv, void *tz);
-#endif /* !HAVE_GETTIMEOFDAY */
-
 #if !HAVE_DECL_LOCALTIME_R
 #if !defined(localtime_r)
-CK_DLL_EXP struct tm *localtime_r(const time_t * clock, struct tm *result);
+CK_DLL_EXP struct tm *localtime_r(const time_t *clock, struct tm *result);
 #endif
 #endif /* !HAVE_DECL_LOCALTIME_R */
 
@@ -255,26 +248,24 @@ CK_DLL_EXP char *strsignal(int sig);
  * specified in seconds and nanoseconds. If it is not defined in
  * time.g, then we need to define it here
  */
-struct timespec
-{
-    time_t tv_sec;
-    long tv_nsec;
+struct timespec {
+  time_t tv_sec;
+  long tv_nsec;
 };
 #endif /* STRUCT_TIMESPEC_DEFINITION_MISSING */
 
 #ifdef STRUCT_ITIMERSPEC_DEFINITION_MISSING
-/* 
- * The following structure is defined in POSIX.1b for timer start values and intervals.
- * If it is not defined in time.h, then we need to define it here.
+/*
+ * The following structure is defined in POSIX.1b for timer start values and
+ * intervals. If it is not defined in time.h, then we need to define it here.
  */
-struct itimerspec
-{
-    struct timespec it_interval;
-    struct timespec it_value;
+struct itimerspec {
+  struct timespec it_interval;
+  struct timespec it_value;
 };
 #endif /* STRUCT_ITIMERSPEC_DEFINITION_MISSING */
 
-/* 
+/*
  * Do a simple forward declaration in case the struct is not defined.
  * In the versions of timer_create in libcompat, sigevent is never
  * used.
@@ -283,10 +274,7 @@ struct sigevent;
 
 CK_DLL_EXP int clock_gettime(clockid_t clk_id, struct timespec *ts);
 CK_DLL_EXP int timer_create(clockid_t clockid, struct sigevent *sevp,
-                            timer_t * timerid);
-CK_DLL_EXP int timer_settime(timer_t timerid, int flags,
-                             const struct itimerspec *new_value,
-                             struct itimerspec *old_value);
+                            timer_t *timerid);
 CK_DLL_EXP int timer_delete(timer_t timerid);
 #endif /* HAVE_LIBRT */
 
