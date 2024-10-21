@@ -1,4 +1,17 @@
 {
     "editor.formatOnSave": true,
-    "editor.tabSize": 2
+    "editor.tabSize": 2,
+    "files.associations": {
+        "check.h": "c",
+        "dns_packet.h": "c",
+        "typeinfo": "c",
+        "stdint.h": "c",
+        "string.h": "c",
+        "main.h": "c",
+        "check_impl.h": "c",
+        "stdlib.h": "c",
+        "libcompat.h": "c",
+        "check_list.h": "c",
+        "check_pretty_print.h": "c"
+    }
 }

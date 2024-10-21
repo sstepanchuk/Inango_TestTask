@@ -1,16 +1,29 @@
 cmake_minimum_required(VERSION 3.5.0)
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+enable_testing()
+
 project(DNS_proxy VERSION 0.1.0 LANGUAGES C)
 
-set(EXECUTABLE_OUTPUT_PATH "bin")
+set(SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
+
+#libraries
+set(LIBS 
+  udp_server
+  thpool
+  dns_packet
+  trafic_stats
+)
 
 # Add subdirectories for the libraries
-add_subdirectory(thpool)
-add_subdirectory(udp_server)
-add_subdirectory(dns_packet)
-add_subdirectory(trafic_stats)
+foreach (lib IN LISTS LIBS)
+  add_subdirectory("${SOURCE_DIR}/${lib}")
+endforeach()
+add_subdirectory(tests)
 
 # Add the executable
-add_executable(DNS_proxy main.c)
+add_executable(${PROJECT_NAME} "${SOURCE_DIR}/main.c")
 
 # Link the libraries
-target_link_libraries(DNS_proxy PRIVATE udp_server thpool dns_packet trafic_stats)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBS})
