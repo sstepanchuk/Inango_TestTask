@@ -13,6 +13,7 @@ TCase *test__validate_class(void);
 TCase *test__validate_qtype(void);
 TCase *test__validate_qclass(void);
 TCase *test__parse_domain_name(void);
+TCase *test__parse_dns_queries(void);
 
 // suite
 Suite *dns_packet_suite(void);
