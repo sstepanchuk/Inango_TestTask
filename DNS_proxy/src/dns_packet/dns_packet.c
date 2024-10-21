@@ -38,7 +38,8 @@ int parse_domain_name(const unsigned char *packet, int packet_size, int pos,
 
     // Перевірка на недійсну довжину мітки або перевищення загальної довжини
     // імені
-    if (label_length > 63 || name_length + label_length >= max_length) {
+    if (label_length > MAX_LABEL_LENGTH ||
+        name_length + label_length >= max_length) {
       free(parsed_name);
       return -1; // Недійсна довжина мітки або перевищена загальна довжина
     }
