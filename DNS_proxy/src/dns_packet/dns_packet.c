@@ -27,6 +27,11 @@ int parse_domain_name(const unsigned char *packet, int packet_size, int pos,
     pos += label_length + 1;
   }
 
+  if (!name_length) {
+    free(parsed_name);
+    return -1; // Недійсна довжина доменного імені
+  }
+
   parsed_name[name_length - 1] =
       '\0'; // Завершення доменного імені нульовим байтом
   *name = parsed_name;
