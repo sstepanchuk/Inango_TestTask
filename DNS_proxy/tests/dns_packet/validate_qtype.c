@@ -3,7 +3,8 @@
 
 // Test for a valid QTYPE
 START_TEST(valid_qtype) {
-  unsigned short valid_qtypes[] = {QTYPE_AXFR, QTYPE_ANY, TYPE_A, TYPE_NS};
+  unsigned short valid_qtypes[] = {DNS_QTYPE_AXFR, DNS_QTYPE_ANY, DNS_TYPE_A,
+                                   DNS_TYPE_NS};
   for (int i = 0; i < sizeof(valid_qtypes) / sizeof(valid_qtypes[0]); i++) {
     ck_assert_int_eq(validate_qtype(valid_qtypes[i]), 1); // Should be valid
   }

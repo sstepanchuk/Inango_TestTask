@@ -3,8 +3,8 @@
 
 // Test for a valid type
 START_TEST(valid_type) {
-  unsigned short valid_types[] = {TYPE_A, TYPE_NS, TYPE_CNAME, TYPE_MX,
-                                  TYPE_TXT};
+  unsigned short valid_types[] = {DNS_TYPE_A, DNS_TYPE_NS, DNS_TYPE_CNAME,
+                                  DNS_TYPE_MX, DNS_TYPE_TXT};
   for (int i = 0; i < sizeof(valid_types) / sizeof(valid_types[0]); i++) {
     ck_assert_int_eq(validate_type(valid_types[i]), 1); // Should be valid
   }

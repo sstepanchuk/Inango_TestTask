@@ -2,7 +2,11 @@
 
 The DNS_proxy proxy project is a simple multithreaded DNS proxy server implemented in C with blacklist functionality. It processes requests using basic blocking sockets and 8 threads. This project includes the main DNS proxy server and a suite of tests to ensure functionality, along with memory leak checks.
 
-Used simple thread pool (thpool) from this repo https://github.com/Pithikos/C-Thread-Pool
+## Usages
+
+* INI parser (inih) https://github.com/benhoyt/inih for parse config
+* Hash map (uthash) https://troydhanson.github.io/uthash/ for udp requests hash map
+* Thread pool (thpool) from this repo https://github.com/Pithikos/C-Thread-Pool
 
 ## Dependencies
 
@@ -21,7 +25,17 @@ Used simple thread pool (thpool) from this repo https://github.com/Pithikos/C-Th
 
 ## Configure DNS proxy
 
-` // IN DEVELOPMENT `
+For configuring DNS proxy you need to create a file `config.ini` in the directory where you run DNS proxy.
+
+```ini
+# Example config.ini
+[upstream_dns]
+ipaddress = 8.8.8.8
+port = 53
+
+[blacklisted]
+response = 142.251.39.68 # type ipaddress if want to renturn success response on blacklisted domains else type error code
+```
 
 ## Run
 
@@ -46,7 +60,9 @@ cmake --build ./build --target DNS_proxy_memory_leak_check # Memory leaks check 
 
 ## What I used for testing 
 
-` // IN DEVELOPMENT `
+* Packet Sender for stress testing and sending udp packages. 
+* Wireshark for exploring udp packages
+* Unit testing for testing DNS proxy
 
 ## Advantages and restrictions
 

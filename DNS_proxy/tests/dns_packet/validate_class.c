@@ -3,7 +3,8 @@
 
 // Test for a valid class
 START_TEST(valid_class) {
-  unsigned short valid_classes[] = {CLASS_IN, CLASS_CS, CLASS_CH, CLASS_HS};
+  unsigned short valid_classes[] = {DNS_CLASS_IN, DNS_CLASS_CS, DNS_CLASS_CH,
+                                    DNS_CLASS_HS};
   for (int i = 0; i < sizeof(valid_classes) / sizeof(valid_classes[0]); i++) {
     ck_assert_int_eq(validate_class(valid_classes[i]), 1); // Should be valid
   }

@@ -12,7 +12,18 @@
 void free_dns_records(DnsAnswer *records, unsigned short count);
 void free_dns_packet(DnsPacket *dns_packet);
 
+// SERIALIZE
+int serialize_domain_name(const char *name, unsigned char *packet, int pos);
+int serialize_dns_header(const DnsHeader *header, unsigned char *packet,
+                         int pos);
+int serialize_dns_queries(const DnsQuery *queries, unsigned short count,
+                          unsigned char *packet, int pos);
+int serialize_dns_answers(const DnsAnswer *answers, unsigned short count,
+                          unsigned char *packet, int pos);
+int serialize_dns_packet(const DnsPacket *dns_packet, unsigned char *packet);
+
 // PARSE
+unsigned char parse_dns_rcode(const char *rcode_str, unsigned char *rcode_out);
 int parse_dns_header(const unsigned char *packet, int packet_size,
                      DnsHeader *header_out);
 

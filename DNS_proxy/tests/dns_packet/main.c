@@ -11,8 +11,9 @@ Suite *dns_packet_suite(void) {
   suite_add_tcase(s, test__validate_class());
   suite_add_tcase(s, test__validate_qtype());
   suite_add_tcase(s, test__validate_qclass());
-  suite_add_tcase(s, test__is_valid_label());
+  suite_add_tcase(s, test__validate_label());
   suite_add_tcase(s, test__parse_domain_name());
   suite_add_tcase(s, test__parse_dns_queries());
+  suite_add_tcase(s, test__serialize_and_parse_domain_name());
   return s;
 }

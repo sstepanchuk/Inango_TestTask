@@ -21,8 +21,8 @@ START_TEST(successful_parse) {
 
   // Validate the parsed query
   ck_assert_str_eq(queries[0].name, "www.example.com");
-  ck_assert_int_eq(queries[0].ques.qtype, TYPE_A);
-  ck_assert_int_eq(queries[0].ques.qclass, CLASS_IN);
+  ck_assert_int_eq(queries[0].ques.qtype, DNS_TYPE_A);
+  ck_assert_int_eq(queries[0].ques.qclass, DNS_CLASS_IN);
 
   // Free allocated memory
   free(queries[0].name);

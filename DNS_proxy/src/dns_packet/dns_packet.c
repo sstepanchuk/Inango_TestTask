@@ -1,5 +1,44 @@
 #include "dns_packet.h"
 
+unsigned char parse_dns_rcode(const char *rcode_str, unsigned char *rcode_out) {
+  if (strcmp(rcode_str, "NOERROR") == 0) {
+    *rcode_out = DNS_RCODE_NOERROR;
+  } else if (strcmp(rcode_str, "FORMERR") == 0) {
+    *rcode_out = DNS_RCODE_FORMERR;
+  } else if (strcmp(rcode_str, "SERVFAIL") == 0) {
+    *rcode_out = DNS_RCODE_SERVFAIL;
+  } else if (strcmp(rcode_str, "NXDOMAIN") == 0) {
+    *rcode_out = DNS_RCODE_NXDOMAIN;
+  } else if (strcmp(rcode_str, "NOTIMP") == 0) {
+    *rcode_out = DNS_RCODE_NOTIMP;
+  } else if (strcmp(rcode_str, "REFUSED") == 0) {
+    *rcode_out = DNS_RCODE_REFUSED;
+  } else if (strcmp(rcode_str, "YXDOMAIN") == 0) {
+    *rcode_out = DNS_RCODE_YXDOMAIN;
+  } else if (strcmp(rcode_str, "YXRRSET") == 0) {
+    *rcode_out = DNS_RCODE_YXRRSET;
+  } else if (strcmp(rcode_str, "NXRRSET") == 0) {
+    *rcode_out = DNS_RCODE_NXRRSET;
+  } else if (strcmp(rcode_str, "NOTAUTH") == 0) {
+    *rcode_out = DNS_RCODE_NOTAUTH;
+  } else if (strcmp(rcode_str, "NOTZONE") == 0) {
+    *rcode_out = DNS_RCODE_NOTZONE;
+  } else if (strcmp(rcode_str, "BADVERS") == 0) {
+    *rcode_out = DNS_RCODE_BADVERS;
+  } else if (strcmp(rcode_str, "BADKEY") == 0) {
+    *rcode_out = DNS_RCODE_BADKEY;
+  } else if (strcmp(rcode_str, "BADTIME") == 0) {
+    *rcode_out = DNS_RCODE_BADTIME;
+  } else if (strcmp(rcode_str, "BADMODE") == 0) {
+    *rcode_out = DNS_RCODE_BADMODE;
+  } else if (strcmp(rcode_str, "BADALG") == 0) {
+    *rcode_out = DNS_RCODE_BADALG;
+  } else
+    return 0;
+
+  return 1;
+}
+
 int parse_dns_header(const unsigned char *packet, int packet_size,
                      DnsHeader *header_out) {
   DnsHeader *dns_header = (DnsHeader *)packet;
@@ -46,7 +85,7 @@ int parse_domain_name(const unsigned char *packet, int packet_size, int pos,
 
     // Перевірка, чи мітка не починається або не закінчується дефісом
     if (packet[pos + 1] == '-' || packet[pos + label_length] == '-' ||
-        !is_valid_label(packet + pos + 1, label_length)) {
+        !validate_label(packet + pos + 1, label_length)) {
       free(parsed_name);
       return -1; // Мітка не може починатися або закінчуватися дефісом
     }
@@ -216,6 +255,14 @@ DnsPacket *parse_dns_packet(const unsigned char *packet, int packet_size) {
       return NULL;
     }
   } else {
+    if (dns_packet->header.q_count > 0) {
+      if (parse_dns_queries(packet, &dns_packet->queries, packet_size, &pos,
+                            dns_packet->header.q_count) < 0) {
+        free(dns_packet);
+        return NULL;
+      }
+    }
+
     if (dns_packet->header.ans_count > 0) {
       if (parse_dns_answers(packet, &dns_packet->answers, packet_size, &pos,
                             dns_packet->header.ans_count) < 0) {
@@ -328,4 +375,176 @@ void print_dns_packet(DnsPacket *dns_packet) {
                     dns_packet->header.auth_count);
   print_dns_section("Additional", dns_packet->additional,
                     dns_packet->header.add_count);
+}
+
+int serialize_domain_name(const char *name, unsigned char *packet, int pos) {
+  if (!name || !packet)
+    return -1; // Validate inputs
+  const char *ptr = name;
+
+  while (1) {
+    // Find the next label (part of the domain name)
+    int label_len = 0;
+
+    // Calculate the label length
+    while (ptr[label_len] != '\0' && ptr[label_len] != '.') {
+      label_len++;
+    }
+
+    // Write the label length to the packet
+    if (pos >= MAX_DNS_PACKET_SIZE - 1 ||
+        pos + label_len + 1 > MAX_DNS_PACKET_SIZE) {
+      return -1; // Not enough space in packet
+    }
+    packet[pos++] = (unsigned char)label_len; // Store label length
+
+    // Write the label itself
+    memcpy(&packet[pos], ptr, label_len);
+    pos += label_len;
+
+    // Break if reached end of name
+    if (ptr[label_len] == '\0') {
+      break;
+    }
+
+    // Move past the dot
+    ptr += label_len + 1; // Move to the next label
+  }
+
+  // Null-terminator for domain name
+  packet[pos++] = 0; // End of domain name
+  return pos;
+}
+
+int serialize_dns_header(const DnsHeader *header, unsigned char *packet,
+                         int pos) {
+  if (!header || !packet)
+    return -1; // Validate inputs
+
+  DnsHeader temp_header = *header;
+
+  // Convert values to network byte order
+  temp_header.id = htons(temp_header.id);
+  temp_header.q_count = htons(temp_header.q_count);
+  temp_header.ans_count = htons(temp_header.ans_count);
+  temp_header.auth_count = htons(temp_header.auth_count);
+  temp_header.add_count = htons(temp_header.add_count);
+
+  // Copy the header to the packet
+  if (pos + sizeof(DnsHeader) > MAX_DNS_PACKET_SIZE) {
+    return -1; // Not enough space in packet
+  }
+  memcpy(&packet[pos], &temp_header, sizeof(DnsHeader));
+  return pos + sizeof(DnsHeader);
+}
+
+int serialize_dns_queries(const DnsQuery *queries, unsigned short count,
+                          unsigned char *packet, int pos) {
+  if (!queries || !packet)
+    return -1; // Validate inputs
+  for (int i = 0; i < count; i++) {
+    // Serialize the domain name
+    pos = serialize_domain_name(queries[i].name, packet, pos);
+    if (pos < 0) {
+      return -1; // Error during serialization
+    }
+
+    // Serialize the query type and class
+    if (pos + 4 > MAX_DNS_PACKET_SIZE) {
+      return -1; // Not enough space in packet
+    }
+    *(unsigned short *)&packet[pos] = htons(queries[i].ques.qtype);
+    *(unsigned short *)&packet[pos + 2] = htons(queries[i].ques.qclass);
+    pos += 4;
+  }
+  return pos;
+}
+
+int serialize_dns_answers(const DnsAnswer *answers, unsigned short count,
+                          unsigned char *packet, int pos) {
+  if (!answers || !packet)
+    return -1; // Validate inputs
+  for (int i = 0; i < count; i++) {
+    // Serialize the domain name
+    pos = serialize_domain_name(answers[i].name, packet, pos);
+    if (pos < 0) {
+      return -1; // Error during serialization
+    }
+
+    // Serialize type, class, TTL, and data length
+    if (pos + 10 > MAX_DNS_PACKET_SIZE) {
+      return -1; // Not enough space in packet
+    }
+    *(unsigned short *)&packet[pos] = htons(answers[i].type);
+    *(unsigned short *)&packet[pos + 2] = htons(answers[i].class);
+    *(unsigned int *)&packet[pos + 4] = htonl(answers[i].ttl);
+    *(unsigned short *)&packet[pos + 8] =
+        htons(answers[i].data ? answers[i].data_len : 0);
+    pos += 10;
+
+    // Copy the answer data
+    if (answers[i].data && answers[i].data_len > 0) {
+      if (pos + answers[i].data_len > MAX_DNS_PACKET_SIZE) {
+        return -1; // Not enough space in packet
+      }
+      memcpy(&packet[pos], answers[i].data, answers[i].data_len);
+      pos += answers[i].data_len;
+    }
+  }
+  return pos;
+}
+
+int serialize_dns_packet(const DnsPacket *dns_packet, unsigned char *packet) {
+  if (!dns_packet || !packet)
+    return -1; // Validate inputs
+  int pos = 0;
+
+  // Serialize the DNS header
+  pos = serialize_dns_header(&dns_packet->header, packet, pos);
+  if (pos < 0) {
+    return -1; // Error during serialization
+  }
+
+  // Serialize queries if it's a query packet
+  if (!dns_packet->header.qr) {
+    pos = serialize_dns_queries(dns_packet->queries, dns_packet->header.q_count,
+                                packet, pos);
+    if (pos < 0) {
+      return -1; // Error during serialization
+    }
+  } else {
+    if (dns_packet->header.q_count > 0) {
+      pos = serialize_dns_queries(dns_packet->queries,
+                                  dns_packet->header.q_count, packet, pos);
+      if (pos < 0) {
+        return -1; // Error during serialization
+      }
+    }
+
+    if (dns_packet->header.ans_count > 0) {
+      pos = serialize_dns_answers(dns_packet->answers,
+                                  dns_packet->header.ans_count, packet, pos);
+      if (pos < 0) {
+        return -1; // Error during serialization
+      }
+    }
+
+    if (dns_packet->header.auth_count > 0) {
+      pos = serialize_dns_answers(dns_packet->authortative,
+                                  dns_packet->header.auth_count, packet, pos);
+      if (pos < 0) {
+        return -1; // Error during serialization
+      }
+    }
+
+    if (dns_packet->header.add_count > 0) {
+      pos = serialize_dns_answers(dns_packet->additional,
+                                  dns_packet->header.add_count, packet, pos);
+      if (pos < 0) {
+        return -1; // Error during serialization
+      }
+    }
+  }
+
+  return pos; // Return the final position (size of the packet)
 }

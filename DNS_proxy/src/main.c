@@ -1,15 +1,31 @@
 #include "main.h"
 
+Config cfg;
 TrafficStats *gstats;
-
+unsigned short cached_dns_id = 0;
 // Кастомний обробник запитів
 void custom_request_handler(UdpServer *server, Request request,
                             DnsPacket *packet) {
+
+  if (packet->header.qr) {
+    int result = add_dns_packet((struct DnsPacketHashEntry){
+        0, packet, request.client_addr, request.addr_len, time(NULL)});
+
+    pthread_mutex_lock(&cached_dns_mutex);
+    printf("New packet with incorrect id: %hu should be: %hu\n", result,
+           cached_dns_id++);
+    pthread_mutex_unlock(&cached_dns_mutex);
+
+    // ssize_t sent_bytes =
+    //    sendto(server->sockfd, message, strlen(message), 0,
+    //           (const struct sockaddr *)&server_addr, sizeof(server_addr));
+  }
+
   // pthread_mutex_lock(&gstats->lock);
   // gstats->total_rx_bytes += request.packet_size;
   // pthread_mutex_unlock(&gstats->lock);
-  print_dns_packet(packet);
-  free_dns_packet(packet);
+  // print_dns_packet(packet);
+  // free_dns_packet(packet);
 }
 
 // Кастомний валідатор запитів
@@ -27,6 +43,13 @@ void speedtester(void *arg) {
 }
 
 int main() {
+  // Parse config
+
+  if (!load_config(&cfg)) {
+    printf("Can't read config file '%s'\n", default_config_file);
+    return 1;
+  }
+
   // Налаштування серверів (порт, розмір буфера, кількість потоків)
   int port = 8080;
   int buffer_size = MAX_DNS_PACKET_SIZE;
@@ -38,6 +61,7 @@ int main() {
   memset(&stats, 0, sizeof(TrafficStats));
   stats.start_time = time(NULL);
   pthread_mutex_init(&stats.lock, NULL);
+  pthread_mutex_init(&cached_dns_mutex, NULL);
 
   gstats = &stats;
 
@@ -55,5 +79,7 @@ int main() {
   thpool_destroy(pool);
   udp_server_destroy(server);
   pthread_mutex_destroy(&stats.lock);
+  free_dns_packet_list();
+  pthread_mutex_destroy(&cached_dns_mutex);
   return 0;
 }

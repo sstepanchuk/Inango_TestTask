@@ -9,6 +9,6 @@ int validate_type(unsigned short type);
 int validate_qtype(unsigned short qtype);
 int validate_class(unsigned short class);
 int validate_qclass(unsigned short qclass);
-int is_valid_label(const unsigned char *packet_with_pos, int label_length);
+int validate_label(const unsigned char *packet_with_pos, int label_length);
 
 #endif

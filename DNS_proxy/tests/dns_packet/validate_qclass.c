@@ -3,7 +3,7 @@
 
 // Test for a valid QCLASS
 START_TEST(valid_qclass) {
-  unsigned short valid_qclasses[] = {QCLASS_ANY, CLASS_IN};
+  unsigned short valid_qclasses[] = {DNS_QCLASS_ANY, DNS_CLASS_IN};
   for (int i = 0; i < sizeof(valid_qclasses) / sizeof(valid_qclasses[0]); i++) {
     ck_assert_int_eq(validate_qclass(valid_qclasses[i]), 1); // Should be valid
   }

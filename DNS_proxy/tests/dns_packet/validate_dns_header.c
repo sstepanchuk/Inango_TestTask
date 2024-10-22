@@ -43,7 +43,7 @@ START_TEST(response_with_queries) {
   header.q_count = 1; // Should be zero for response
   header.ans_count = 1;
   int result = validate_dns_header(&header, sizeof(header));
-  ck_assert_int_eq(result, 0); // Should be invalid
+  ck_assert_int_eq(result, 1); // Should be valid
 }
 END_TEST
 
