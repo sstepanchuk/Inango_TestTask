@@ -7,11 +7,11 @@
 #include <unistd.h>
 
 // Функція для створення нового UDP сервера
-UdpServer *udp_server_create(int port, int buffer_size, int socket_buffer_size,
+UdpServer *udp_server_create(int port, int socket_buffer_size,
                              int sock_type_flags) {
   UdpServer *server = malloc(sizeof(UdpServer));
   server->port = port;
-  server->buffer_size = buffer_size;
+  // server->buffer_size = buffer_size;
 
   // Створення UDP-сокета
   if ((server->sockfd = socket(AF_INET, SOCK_DGRAM | sock_type_flags, 0)) < 0) {
@@ -53,44 +53,19 @@ void udp_server_destroy(UdpServer *server) {
   free(server);
 }
 
-void _udp_server_request_handler(ServerRequestInfo *info) {
-  info->request_handler(info->server, info->request, info->validation_context);
-  free(info->request.buffer); // Звільняємо буфер у разі помилки
-  free(info);
-}
-
 // Функція для запуску сервера
-void udp_server_listen(
-    UdpServer *server, RequestHandler handler,
-    RequestValidatorHandler validation_handler, threadpool pool,
-    ServerRequestInfo **_rinfo) // Можна тільки в одному потоці
+void udp_server_listen(UdpServer *server, RequestResolveHandler handler,
+                       void *context) // Можна тільки в одному потоці
 {
-  // Основний цикл сервера
-  ServerRequestInfo *rinfo = *_rinfo;
-  Request *request;
+  Request request;
   socklen_t addr_len;
 
-  if (rinfo == NULL) {
-    rinfo = malloc(sizeof(ServerRequestInfo));
-    request = &rinfo->request;
+  request.packet_size =
+      recvfrom(server->sockfd, request.buffer, (size_t)SERVER_BUFFER_SIZE, 0,
+               (struct sockaddr *)&request.client_addr, &addr_len);
 
-    rinfo->server = server;
-    rinfo->request_handler = handler;
-    request->buffer = malloc(server->buffer_size); // Виділяємо буфер динамічно
-    addr_len = sizeof(request->client_addr);
-  }
-
-  request->packet_size =
-      recvfrom(server->sockfd, request->buffer, server->buffer_size, 0,
-               (struct sockaddr *)&request->client_addr, &addr_len);
-
-  if (request->packet_size > 0) {
-    if (validation_handler == NULL ||
-        (rinfo->validation_context = validation_handler(server, *request))) {
-      thpool_add_work(pool, (void (*)(void *)) & _udp_server_request_handler,
-                      (void *)rinfo);
-      rinfo = NULL;
-    }
+  if (request.packet_size > 0) {
+    handler(server, request, context);
   } else if (errno != EAGAIN && errno != EWOULDBLOCK)
     perror("Помилка recvfrom");
 }

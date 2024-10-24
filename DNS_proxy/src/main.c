@@ -1,85 +1,98 @@
 #include "main.h"
 
-Config cfg;
-TrafficStats *gstats;
-unsigned short cached_dns_id = 0;
-// Кастомний обробник запитів
-void custom_request_handler(UdpServer *server, Request request,
-                            DnsPacket *packet) {
+void dns_server_response_handler(DNSRequestContext *context) {
+  DnsPacket *packet = context->packet;
 
-  if (packet->header.qr) {
-    int result = add_dns_packet((struct DnsPacketHashEntry){
-        0, packet, request.client_addr, request.addr_len, time(NULL)});
-
-    pthread_mutex_lock(&cached_dns_mutex);
-    printf("New packet with incorrect id: %hu should be: %hu\n", result,
-           cached_dns_id++);
-    pthread_mutex_unlock(&cached_dns_mutex);
-
-    // ssize_t sent_bytes =
-    //    sendto(server->sockfd, message, strlen(message), 0,
-    //           (const struct sockaddr *)&server_addr, sizeof(server_addr));
-  }
-
-  // pthread_mutex_lock(&gstats->lock);
-  // gstats->total_rx_bytes += request.packet_size;
-  // pthread_mutex_unlock(&gstats->lock);
-  // print_dns_packet(packet);
-  // free_dns_packet(packet);
+  free_dns_packet(packet);
+  free(context);
 }
 
-// Кастомний валідатор запитів
-void *custom_request_validator(UdpServer *server, Request request) {
-  return parse_dns_packet(request.buffer, request.packet_size);
-  // return (void *)1;
+void proxy_incomming_request_handler(DNSRequestContext *context) {
+  static unsigned short cached_dns_id = 0;
+
+  DnsPacket *packet = context->packet;
+
+  int result = add_dns_packet((struct DnsPacketHashEntry){
+      0, packet, context->client_addr, context->addr_len, time(NULL)});
+
+  pthread_mutex_lock(&cached_dns_mutex);
+  printf("New incomming packet with incorrect id: %hu should be: %hu\n", result,
+         cached_dns_id++);
+  pthread_mutex_unlock(&cached_dns_mutex);
+
+  free(context);
 }
 
-// Кастомний обробник запитів
-void speedtester(void *arg) {
-  while (1) {
-    sleep(INTERVAL);
-    calculate_and_print_traffic_speed(gstats);
+void request_handler(UdpServer *server, Request request,
+                     ServerContext *servercontext) {
+  DnsPacket *packet = parse_dns_packet(request.buffer, request.packet_size);
+  if (packet == NULL)
+    return;
+
+  if (packet->header.qr &&
+      request.client_addr.sin_addr.s_addr !=
+          servercontext->cfg.upstreamdns_ipaddress.sin_addr.s_addr) {
+    free_dns_packet(packet);
+    return;
   }
+
+  DNSRequestContext *request_context = malloc(sizeof(DNSRequestContext));
+  request_context->server = servercontext;
+  request_context->packet = packet;
+  request_context->client_addr = request.client_addr;
+  request_context->addr_len = request.addr_len;
+
+  if (packet->header.qr)
+    thpool_add_work(servercontext->response_thpool,
+                    (void (*)(void *))dns_server_response_handler,
+                    (void *)request_context);
+  else
+    thpool_add_work(servercontext->requests_thpool,
+                    (void (*)(void *))proxy_incomming_request_handler,
+                    (void *)request_context);
+}
+// Кастомний обробник запитів
+// void speedtester(void *arg) {
+//  while (1) {
+//    sleep(INTERVAL);
+//    calculate_and_print_traffic_speed(gstats);
+//  }
+//}
+
+void free_proxy(ServerContext *servercontext) {
+  thpool_destroy(servercontext->requests_thpool);
+  thpool_destroy(servercontext->response_thpool);
+  udp_server_destroy(servercontext->server);
+  pthread_mutex_destroy(&servercontext->gstats.lock);
+  free_dns_packet_list();
+  pthread_mutex_destroy(&cached_dns_mutex);
 }
 
 int main() {
   // Parse config
+  ServerContext server_context;
 
-  if (!load_config(&cfg)) {
+  if (!load_config(&server_context.cfg)) {
     printf("Can't read config file '%s'\n", default_config_file);
     return 1;
   }
 
-  // Налаштування серверів (порт, розмір буфера, кількість потоків)
-  int port = 8080;
-  int buffer_size = MAX_DNS_PACKET_SIZE;
-  int thread_pool_size = 8;
-
-  threadpool pool = thpool_init(thread_pool_size);
-  UdpServer *server = udp_server_create(port, buffer_size, 1024 * 1024, 0);
-  TrafficStats stats;
-  memset(&stats, 0, sizeof(TrafficStats));
-  stats.start_time = time(NULL);
-  pthread_mutex_init(&stats.lock, NULL);
+  server_context.requests_thpool = thpool_init(MAX_THREADS / 2);
+  server_context.response_thpool = thpool_init(MAX_THREADS / 2);
+  server_context.server = udp_server_create(SERVER_PORT, 1024 * 1024, 0);
   pthread_mutex_init(&cached_dns_mutex, NULL);
 
-  gstats = &stats;
-
-  if (!server)
-    fprintf(stderr, "Не вдалося створити сервер на порту %d\n", port);
-
-  // thpool_add_work(pool, speedtester, 0);
-
-  ServerRequestInfo *info = NULL;
-  while (1) {
-    udp_server_listen(server, (RequestHandler)custom_request_handler,
-                      custom_request_validator, pool, &info);
+  if (!server_context.server) {
+    fprintf(stderr, "Не вдалося створити сервер на порту %d\n", SERVER_PORT);
+    free_proxy(&server_context);
+    return 1;
   }
 
-  thpool_destroy(pool);
-  udp_server_destroy(server);
-  pthread_mutex_destroy(&stats.lock);
-  free_dns_packet_list();
-  pthread_mutex_destroy(&cached_dns_mutex);
+  while (1) {
+    udp_server_listen(server_context.server,
+                      (RequestResolveHandler)request_handler, &server_context);
+  }
+
+  free_proxy(&server_context);
   return 0;
 }

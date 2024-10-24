@@ -1,6 +1,6 @@
 #include "dns_packet.h"
 
-int validate_dns_header(DnsHeader *dns_header, int packet_size) {
+int validate_dns_header(const DnsHeader *dns_header, int packet_size) {
 
   if (packet_size < sizeof(DnsHeader)) {
     return 0;
@@ -34,7 +34,7 @@ int validate_dns_header(DnsHeader *dns_header, int packet_size) {
   return 1;
 }
 
-int validate_type(unsigned short type) {
+int validate_type(const unsigned short type) {
 
   switch (type) {
   case DNS_TYPE_A:
@@ -63,7 +63,7 @@ int validate_type(unsigned short type) {
   return 1;
 }
 
-int validate_class(unsigned short class) {
+int validate_class(const unsigned short class) {
 
   switch (class) {
   case DNS_CLASS_IN:
@@ -78,7 +78,7 @@ int validate_class(unsigned short class) {
   return 1;
 }
 
-int validate_qtype(unsigned short qtype) {
+int validate_qtype(const unsigned short qtype) {
   if (validate_type(qtype))
     return 1;
 
@@ -93,7 +93,7 @@ int validate_qtype(unsigned short qtype) {
   }
 }
 
-int validate_qclass(unsigned short qclass) {
+int validate_qclass(const unsigned short qclass) {
   if (validate_class(qclass))
     return 1;
 
@@ -105,7 +105,8 @@ int validate_qclass(unsigned short qclass) {
   }
 }
 
-int validate_label(const unsigned char *packet_with_pos, int label_length) {
+int validate_label(const unsigned char *packet_with_pos,
+                   const int label_length) {
   if (!label_length || packet_with_pos[0] == '-' ||
       packet_with_pos[label_length - 1] == '-') {
     return 0;

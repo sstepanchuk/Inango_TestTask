@@ -17,6 +17,8 @@ set(LIBS
   trafic_stats
   inih
   dns_packet_list
+  load_config
+  utils
 )
 
 # Add subdirectories for the libraries
@@ -26,7 +28,7 @@ endforeach()
 add_subdirectory(tests)
 
 # Add the executable
-add_executable(${PROJECT_NAME} "${SOURCE_DIR}/main.c" "${SOURCE_DIR}/load_config.c")
+add_executable(${PROJECT_NAME} "${SOURCE_DIR}/main.c")
 
 # Link the libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBS})

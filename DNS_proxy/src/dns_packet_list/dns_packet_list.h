@@ -2,7 +2,6 @@
 #define H_DNS_PACKET_LIST
 
 #include "dns_packet.h"
-#include "utils/uthash.h"
 #include <time.h>
 #include <pthread.h>
 #include <netinet/in.h>

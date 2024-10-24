@@ -1,6 +1,8 @@
 #ifndef DNS_DEFS_H
 #define DNS_DEFS_H
 
+#include "uthash.h"
+
 #define MAX_DNS_PACKET_SIZE 512
 #define MAX_DOMAIN_LENGTH 253
 #define MAX_LABEL_LENGTH 63
@@ -121,5 +123,11 @@ typedef struct {
   DnsAuthortative *authortative;
   DnsAdditional *additional;
 } DnsPacket;
+
+typedef struct {
+  char key[MAX_DOMAIN_LENGTH];
+  unsigned short position;
+  UT_hash_handle hh;
+} DomainLabelCacheEntry;
 
 #endif

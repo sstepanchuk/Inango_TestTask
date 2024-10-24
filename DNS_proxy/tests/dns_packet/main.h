@@ -15,6 +15,7 @@ TCase *test__validate_qclass(void);
 TCase *test__validate_label(void);
 TCase *test__parse_domain_name(void);
 TCase *test__parse_dns_queries(void);
+TCase *test__parse_dns_packet(void);
 TCase *test__serialize_and_parse_domain_name(void);
 
 // suite

@@ -5,6 +5,7 @@ int main(void) {
   int number_failed;
   SRunner *sr;
   sr = srunner_create(dns_packet_suite());
+  srunner_set_fork_status(sr, CK_NOFORK);
   srunner_run_all(sr, CK_MINIMAL);
 
   print_test_results_tree(sr);

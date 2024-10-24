@@ -23,6 +23,9 @@
         "tuple": "c",
         "type_traits": "c",
         "utility": "c",
-        "thpool.h": "c"
+        "thpool.h": "c",
+        "load_config.h": "c",
+        "memrchr.h": "c",
+        "uthash.h": "c"
     }
 }
