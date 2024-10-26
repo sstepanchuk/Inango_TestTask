@@ -46,10 +46,10 @@ file_with_domains = blacklisted.txt #required | default blacklisted.txt
 
 After this create ASCII file with blacklisted domains, by default filename is `blacklisted.txt` (file ecoding should be ASCII!)
 
-`
+```
 google.com
 microsoft.org
-`
+```
 
 ## Run
 
