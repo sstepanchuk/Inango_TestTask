@@ -7,9 +7,10 @@
 #include "trafic_stats.h"
 #include "udp_server.h"
 #include "load_config.h"
+#include "remove_elements.h"
 
 #define MAX_THREADS 8
-#define SERVER_PORT 8080
+#define MAX_THREADS 8
 
 typedef struct {
   UdpServer *server;

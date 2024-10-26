@@ -26,6 +26,11 @@
         "thpool.h": "c",
         "load_config.h": "c",
         "memrchr.h": "c",
-        "uthash.h": "c"
+        "uthash.h": "c",
+        "algorithm": "c",
+        "cerrno": "c",
+        "string_view": "c",
+        "initializer_list": "c",
+        "string": "c"
     }
 }

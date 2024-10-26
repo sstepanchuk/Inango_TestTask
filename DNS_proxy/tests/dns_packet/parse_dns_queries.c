@@ -11,11 +11,9 @@ START_TEST(successful_parse) {
       0x00, 0x01                                 // QCLASS IN
   };
   DnsQuery *queries = NULL;
-  int pos = 0;
   unsigned short count = 1;
+  int pos = parse_dns_queries(packet, &queries, sizeof(packet), pos, count);
 
-  int result = parse_dns_queries(packet, &queries, sizeof(packet), &pos, count);
-  ck_assert_int_eq(result, 0); // Should succeed
   ck_assert_int_eq(pos,
                    sizeof(packet)); // Position should be at the end of packet
 
@@ -40,11 +38,10 @@ START_TEST(invalid_query_data) {
       0xFF, 0x00                                 // Invalid QCLASS
   };
   DnsQuery *queries = NULL;
-  int pos = 0;
   unsigned short count = 1;
+  int pos = parse_dns_queries(packet, &queries, sizeof(packet), pos, count);
 
-  int result = parse_dns_queries(packet, &queries, sizeof(packet), &pos, count);
-  ck_assert_int_eq(result, -1); // Should fail due to invalid QCLASS
+  ck_assert_int_eq(pos, -1); // Should fail due to invalid QCLASS
 }
 END_TEST
 
@@ -58,11 +55,10 @@ START_TEST(packet_size_too_small) {
       0x00                                       // Incomplete data (too small)
   };
   DnsQuery *queries = NULL;
-  int pos = 0;
-  unsigned short count = 1;
 
-  int result = parse_dns_queries(packet, &queries, sizeof(packet), &pos, count);
-  ck_assert_int_eq(result, -1); // Should fail due to packet size
+  unsigned short count = 1;
+  int pos = parse_dns_queries(packet, &queries, sizeof(packet), pos, count);
+  ck_assert_int_eq(pos, -1); // Should fail due to packet size
 }
 END_TEST
 

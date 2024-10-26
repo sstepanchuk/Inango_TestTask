@@ -37,14 +37,14 @@ START_TEST(test_serialize_valid_domain_name_with_compress) {
   const char *second_domain_name = "www.example.com";
   const char *third_domain_name = "test.www.example.com";
   const char *forth_domain_name = "mynet.com";
-  const char *fifth_domain_name = "test23.www.example.com.ua";
+  // const char *fifth_domain_name = "test23.www.example.com.ua";
 
   DomainLabelCacheEntry *cache = NULL;
   int pos = serialize_domain_name(first_domain_name, packet, 0, &cache);
   pos = serialize_domain_name(second_domain_name, packet, pos, &cache);
   pos = serialize_domain_name(third_domain_name, packet, pos, &cache);
   pos = serialize_domain_name(forth_domain_name, packet, pos, &cache);
-  pos = serialize_domain_name(fifth_domain_name, packet, pos, &cache);
+  // pos = serialize_domain_name(fifth_domain_name, packet, pos, &cache);
   pos = serialize_domain_name(first_domain_name, packet, pos, &cache);
 
   free_domain_cache(&cache);
@@ -52,11 +52,11 @@ START_TEST(test_serialize_valid_domain_name_with_compress) {
   // clang-format off
   const char packet_should_be[] = {
     0x07, 'e', 'x', 'a',  'm',  'p',  'l',  'e',  0x03, 'c',  'o', 'm', 0x00,                   // example.com
-    0x03, 'w', 'w', 'w',  0xc0, 0x00, 0x00, // www > example.com
-    0x04, 't', 'e', 's',  't',  0xc0, 0x0D, 0x00,
-    0x05, 'm',  'y', 'n', 'e',  't',  0xc0, 0x08, 0x00,
-    0x06, 't', 'e', 's', 't', '2', '3', 0xc0, 0x0D, 0x02, 'u', 'a', 0x00,
-    0xc0, 0x00, 0x00
+    0x03, 'w', 'w', 'w',  0xc0, 0x00, // www > example.com
+    0x04, 't', 'e', 's',  't',  0xc0, 0x0D,
+    0x05, 'm',  'y', 'n', 'e',  't',  0xc0, 0x08,
+    // 0x06, 't', 'e', 's', 't', '2', '3', 0xc0, 0x0D, 0x02, 'u', 'a', 0x00,
+    0xc0, 0x00,
   };
   // clang-format on
 

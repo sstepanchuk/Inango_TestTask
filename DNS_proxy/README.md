@@ -29,13 +29,27 @@ For configuring DNS proxy you need to create a file `config.ini` in the director
 
 ```ini
 # Example config.ini
+[server]
+port = 8000 # not required | 53 default
+
 [upstream_dns]
-ipaddress = 8.8.8.8
-port = 53
+ipaddress = 8.8.8.8 # required
+port = 53 # required
 
 [blacklisted]
-response = 142.251.39.68 # type ipaddress if want to renturn success response on blacklisted domains else type error code
+response = REFUSED # required | if no error we return ip addresses from config 
+response_ip = 142.251.46.174 # required if response = NOERROR
+response_ipv6 = 2607:f8b0:4005:811::200e # required if response = NOERROR
+
+file_with_domains = blacklisted.txt #required | default blacklisted.txt
 ```
+
+After this create ASCII file with blacklisted domains, by default filename is `blacklisted.txt` (file ecoding should be ASCII!)
+
+`
+google.com
+microsoft.org
+`
 
 ## Run
 

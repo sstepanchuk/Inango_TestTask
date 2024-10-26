@@ -15,7 +15,7 @@ UdpServer *udp_server_create(int port, int socket_buffer_size,
 
   // Створення UDP-сокета
   if ((server->sockfd = socket(AF_INET, SOCK_DGRAM | sock_type_flags, 0)) < 0) {
-    perror("Не вдалося створити сокет");
+    perror("Can't create socket");
     free(server);
     return NULL;
   }
@@ -29,7 +29,7 @@ UdpServer *udp_server_create(int port, int socket_buffer_size,
 
   if (setsockopt(server->sockfd, SOL_SOCKET, SO_RCVBUF, &socket_buffer_size,
                  sizeof(socket_buffer_size)) < 0) {
-    perror("Не вдалося змінити розмір буфера сокета");
+    perror("Can't change socket buffer size");
     close(server->sockfd);
     free(server);
     return NULL;
@@ -38,7 +38,7 @@ UdpServer *udp_server_create(int port, int socket_buffer_size,
   // Прив'язка сокета до адреси
   if (bind(server->sockfd, (const struct sockaddr *)&server_addr,
            sizeof(server_addr)) < 0) {
-    perror("Не вдалося прив'язати сокет");
+    perror("Can't bind socket");
     close(server->sockfd);
     free(server);
     return NULL;
@@ -58,11 +58,11 @@ void udp_server_listen(UdpServer *server, RequestResolveHandler handler,
                        void *context) // Можна тільки в одному потоці
 {
   Request request;
-  socklen_t addr_len;
+  request.addr_len = sizeof(request.client_addr);
 
   request.packet_size =
       recvfrom(server->sockfd, request.buffer, (size_t)SERVER_BUFFER_SIZE, 0,
-               (struct sockaddr *)&request.client_addr, &addr_len);
+               (struct sockaddr *)&request.client_addr, &request.addr_len);
 
   if (request.packet_size > 0) {
     handler(server, request, context);

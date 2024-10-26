@@ -23,8 +23,8 @@ unsigned short add_dns_packet(struct DnsPacketHashEntry hentry) {
     entry->client_addr = hentry.client_addr;
     entry->create_time = hentry.create_time;
   }
-  ++next_dns_package_id;
   unsigned short result = next_dns_package_id;
+  ++next_dns_package_id;
   pthread_mutex_unlock(&cached_dns_mutex);
   return result;
 }
@@ -39,6 +39,7 @@ unsigned char get_dns_packet(unsigned short key,
     HASH_DEL(cached_dns_packets, entry);
     *out_entry = *entry;
     free(entry);
+    pthread_mutex_unlock(&cached_dns_mutex);
     return 1; // Return the pointer to DnsPacket if found
   }
   pthread_mutex_unlock(&cached_dns_mutex);

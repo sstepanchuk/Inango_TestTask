@@ -117,6 +117,16 @@ typedef DnsAnswer DnsAuthortative;
 typedef DnsAnswer DnsAdditional;
 
 typedef struct {
+  char primary_ns[MAX_DOMAIN_LENGTH + 1];
+  char responsible_email[MAX_DOMAIN_LENGTH + 1];
+  uint32_t serial;
+  uint32_t refresh;
+  uint32_t retry;
+  uint32_t expire;
+  uint32_t minimum_ttl;
+} SOARecord;
+
+typedef struct {
   DnsHeader header;  // Заголовок DNS
   DnsQuery *queries; // Запитання
   DnsAnswer *answers;
@@ -127,6 +137,7 @@ typedef struct {
 typedef struct {
   char key[MAX_DOMAIN_LENGTH];
   unsigned short position;
+  unsigned short iteration;
   UT_hash_handle hh;
 } DomainLabelCacheEntry;
 
