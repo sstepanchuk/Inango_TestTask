@@ -135,14 +135,13 @@ typedef struct {
 } DnsPacket;
 
 typedef struct {
-  unsigned short preference;          // Preference value for the mail server
-  char primary_ns[MAX_DOMAIN_LENGTH]; // Domain name of the mail server
+  unsigned short preference; // Preference value for the mail server
+  char primary_ns[MAX_DOMAIN_LENGTH + 1]; // Domain name of the mail server
 } MXRecord;
 
 typedef struct {
   char key[MAX_DOMAIN_LENGTH];
   unsigned short position;
-  unsigned short iteration;
   UT_hash_handle hh;
 } DomainLabelCacheEntry;
 
