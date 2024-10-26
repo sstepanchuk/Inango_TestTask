@@ -202,6 +202,26 @@ int parse_soa_record(const unsigned char *packet, int packet_size, int pos,
   return pos; // Return the new position after parsing
 }
 
+int parse_mx_record(const unsigned char *packet, int packet_size, int pos,
+                    MXRecord *mx) {
+  if (pos >= packet_size)
+    return -1; // Check for bounds
+
+  // Read Preference
+  if (pos + 2 > packet_size)
+    return -1; // Check bounds for 2-byte field
+
+  mx->preference = ntohs(*(uint16_t *)(packet + pos));
+  pos += 2;
+
+  // Parse Mail Exchange Domain Name
+  pos = _parse_domain_name(packet, packet_size, pos, mx->primary_ns);
+  if (pos < 0)
+    return -1;
+
+  return pos; // Return the new position after parsing
+}
+
 int parse_dns_answers(const unsigned char *packet, DnsAnswer **_answers,
                       const int packet_size, int pos,
                       const unsigned short count) {
@@ -268,11 +288,28 @@ int parse_dns_answers(const unsigned char *packet, DnsAnswer **_answers,
           return -1;
         }
 
-        data_len = sizeof(SOARecord);
+        data_len = sizeof(MXRecord);
+        break;
+
+      case DNS_TYPE_MX:
+        answers[i].data = malloc(sizeof(MXRecord));
+        if (!answers[i].data ||
+            (pos = parse_mx_record(packet, packet_size, pos,
+                                   (MXRecord *)answers[i].data)) < 0) {
+          for (int j = 0; j < i; j++) {
+            free(answers[j].name);
+            free(answers[j].data);
+          }
+          free(answers[i].name);
+          free(answers[i].data);
+          free(answers);
+          return -1;
+        }
+
+        data_len = sizeof(MXRecord);
         break;
       case DNS_TYPE_CNAME:
       case DNS_TYPE_NS:
-      case DNS_TYPE_MX:
       case DNS_TYPE_PTR:
         if (pos = parse_domain_name(packet, packet_size, pos,
                                     (char **)&answers[i].data) < 0) {
@@ -630,6 +667,23 @@ int serialize_soa_record(const SOARecord *soa, unsigned char *packet, int pos,
   return pos; // Return the new position after writing
 }
 
+int serialize_mx_record(const MXRecord *mx, unsigned char *packet, int pos,
+                        DomainLabelCacheEntry **domain_cache) {
+  // Write Preference
+  if (pos + 2 > MAX_DNS_PACKET_SIZE)
+    return -1; // Ensure space for 2-byte field
+
+  *(uint16_t *)(packet + pos) = htons(mx->preference);
+  pos += 2;
+
+  // Write Mail Exchange Domain Name
+  pos = serialize_domain_name(mx->primary_ns, packet, pos, domain_cache);
+  if (pos < 0)
+    return -1;
+
+  return pos; // Return the new position after writing
+}
+
 int serialize_dns_answers(const DnsAnswer *answers, unsigned short count,
                           unsigned char *packet, int pos,
                           DomainLabelCacheEntry **domain_cache) {
@@ -666,9 +720,19 @@ int serialize_dns_answers(const DnsAnswer *answers, unsigned short count,
         *(unsigned short *)&packet[data_len_pos] =
             htons(pos - (data_len_pos + 2));
       } break;
+      case DNS_TYPE_MX: {
+        int data_len_pos = pos - 2;
+        pos = serialize_mx_record((const MXRecord *)answers[i].data, packet,
+                                  pos, domain_cache);
+
+        if (data_len_pos + 2 + 10 > MAX_DNS_PACKET_SIZE) {
+          return -1; // Not enough space in packet
+        }
+        *(unsigned short *)&packet[data_len_pos] =
+            htons(pos - (data_len_pos + 2));
+      } break;
       case DNS_TYPE_CNAME:
       case DNS_TYPE_NS:
-      case DNS_TYPE_MX:
       case DNS_TYPE_PTR: {
         int data_len_pos = pos - 2;
         pos = serialize_domain_name(answers[i].data, packet, pos, domain_cache);

@@ -89,6 +89,7 @@ cmake --build ./build --target DNS_proxy_memory_leak_check # Memory leaks check 
 * Restrictions 
   * not fully optimized, think I can find ways to make it faster 
   * max received traffic is ~3 Mb/s, but I send ~10 Mb/s (used Packet Sender for intensive tests, I think some packets are lost)
+  * EDS0 support
 
 
  

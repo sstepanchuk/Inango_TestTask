@@ -281,7 +281,7 @@ START_TEST(response_correct_mx) {
       0x00, 0x0f,               // Type: MX
       0x00, 0x01,               // Class: IN
       0x00, 0x00, 0x00, 0x3c,   // TTL: 60 seconds
-      0x00, 0x09,               // Data length: 11 bytes
+      0x00, 0x09,               // Data length: 9 bytes
       0x00, 0x05,               // Preference: 5
       0x04, 'm', 'a', 'i', 'l', // "mail"
       0xc0, 0x0c                // Domain: pointer to "example.net"
