@@ -65,7 +65,7 @@ unsigned char clean_packet(DnsPacket *packet, DNSRequestContext *context) {
       blocked_response->header.rcode =
           context->server->cfg.blacklisted_response;
 
-    unsigned short query_id;
+    unsigned short query_id, qtype, str_size, addr_size;
 
     for (unsigned short i = 0; i < blocked_query_count; i++) {
       query_id = blocked_query_ids[i];
@@ -73,7 +73,9 @@ unsigned char clean_packet(DnsPacket *packet, DNSRequestContext *context) {
       ++blocked_response->header.q_count;
 
       if (context->server->cfg.blacklisted_response == DNS_RCODE_NOERROR) {
-        unsigned char str_size = strlen(packet->queries[query_id].name) + 1;
+        str_size = strlen(packet->queries[query_id].name) + 1;
+        qtype = packet->queries[query_id].ques.qtype;
+
         blocked_response->answers[i].class =
             packet->queries[query_id].ques.qclass;
         blocked_response->answers[i].type =
@@ -82,6 +84,16 @@ unsigned char clean_packet(DnsPacket *packet, DNSRequestContext *context) {
         blocked_response->answers[i].name = malloc(str_size);
         strncpy(blocked_response->answers[i].name,
                 packet->queries[query_id].name, str_size);
+        qtype = packet->queries[query_id].ques.qtype;
+        addr_size = qtype == DNS_TYPE_A ? sizeof(struct in_addr)
+                                        : sizeof(struct in6_addr);
+        blocked_response->answers[i].data = malloc(addr_size);
+        blocked_response->answers[i].data_len = addr_size;
+        memcpy(blocked_response->answers[i].data,
+               qtype == DNS_TYPE_A
+                   ? (void *)context->server->cfg.blacklisted_ip_response
+                   : (void *)context->server->cfg.blacklisted_ipv6_response,
+               addr_size);
         ++blocked_response->header.ans_count;
       }
     }
