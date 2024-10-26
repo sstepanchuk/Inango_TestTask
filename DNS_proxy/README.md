@@ -82,9 +82,10 @@ cmake --build ./build --target DNS_proxy_memory_leak_check # Memory leaks check 
 
 * Advantages 
   * It multithreaded
-  * Thread pool for maximizing productivity
+  * Thread pool for maximizing productivity (splited, 4 threads for requests for dns clients and 4 threads for responses from dns upstream)
   * Nice project structure
   * Test coverage (Check lib and CTest)
+  * Fully Implemented Domain Compress functionality [(RFC 1035 4.14)](https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.4)
 
 * Restrictions 
   * not fully optimized, think I can find ways to make it faster 
