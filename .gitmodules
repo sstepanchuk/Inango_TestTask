@@ -1,0 +1,4 @@
+[submodule "Linux_Kernel_Module/poky"]
+	path = Linux_Kernel_Module/poky
+	url = https://git.yoctoproject.org/poky
+	branch = scarthgap
