@@ -20,7 +20,6 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  // Перевірити розмір файлу та збільшити його, якщо потрібно
   if (lseek(disk_fd, DISK_SIZE - 1, SEEK_SET) == -1) {
     perror("lseek");
     return 1;
@@ -48,7 +47,7 @@ int main(int argc, char *argv[]) {
       break;
     }
 
-    command[strcspn(command, "\n")] = 0; // Видалити символ нового рядка
+    command[strcspn(command, "\n")] = 0;
 
     token = strtok(command, " ");
     if (token == NULL) {
@@ -124,12 +123,12 @@ void clear_cluster(const uint32_t cluster) {
 
   uint8_t *buffer = calloc(CLUSTER_SIZE, 1);
   if (!buffer) {
-    perror("Не вдалося виділити пам'ять для буфера");
+    perror("ERROR: Can't alloc memory");
     return;
   }
 
   lseek(disk_fd, first_sector * boot_sector.bytes_per_sector, SEEK_SET);
-  write(disk_fd, buffer, CLUSTER_SIZE); // Записуємо нулі в кластер
+  write(disk_fd, buffer, CLUSTER_SIZE);
 
   free(buffer);
 }
@@ -179,7 +178,7 @@ void write_fat_entry(const uint32_t cluster, uint32_t value) {
   lseek(disk_fd, fat_sector * boot_sector.bytes_per_sector + sector_offset,
         SEEK_SET);
   if (write(disk_fd, &value, sizeof(value)) != sizeof(value)) {
-    perror("Помилка запису у FAT");
+    perror("ERROR write to FAT");
     return;
   }
 
@@ -187,7 +186,7 @@ void write_fat_entry(const uint32_t cluster, uint32_t value) {
   lseek(disk_fd, fat_sector * boot_sector.bytes_per_sector + sector_offset,
         SEEK_SET);
   if (write(disk_fd, &value, sizeof(value)) != sizeof(value)) {
-    perror("Помилка запису в другу копію FAT");
+    perror("ERROR write to second copy of FAT");
   }
 }
 
@@ -203,7 +202,7 @@ uint32_t read_fat_entry(const uint32_t cluster) {
 
   uint32_t entry;
   if (read(disk_fd, &entry, sizeof(entry)) != sizeof(entry)) {
-    perror("Помилка зчитування з FAT");
+    perror("ERROR reading from FAT");
     return 0;
   }
 
@@ -335,7 +334,7 @@ void format_disk() {
   boot_sector.number_of_heads = 255;
   boot_sector.hidden_sectors = 0;
   boot_sector.total_sectors_32 = DISK_SIZE / boot_sector.bytes_per_sector;
-  boot_sector.sectors_per_fat_32 = 0; // Буде розраховано пізніше
+  boot_sector.sectors_per_fat_32 = 0; // Will calculated later
   boot_sector.flags = 0x0000;
   boot_sector.version = 0x0000;
   boot_sector.root_cluster = ROOT_CLUSTER;
@@ -390,9 +389,7 @@ void format_disk() {
   free(root_dir);
 
   printf("Ok\n");
-  current_cluster =
-      boot_sector
-          .root_cluster; // Встановити поточний кластер на кореневий каталог
+  current_cluster = boot_sector.root_cluster;
 
   cmd_path[0] = '/';
   cmd_path[1] = '\0';
@@ -400,13 +397,11 @@ void format_disk() {
 
 void cmd_cd(const char *path) {
   if (path == NULL || strlen(path) == 0) {
-    return; // Нічого не робити, якщо шлях пустий
+    return;
   }
 
-  // Перевірка, чи це кореневий каталог
   if (strcmp(path, "/") == 0) {
-    current_cluster =
-        boot_sector.root_cluster; // Перехід до кореневого каталогу
+    current_cluster = boot_sector.root_cluster;
     strcpy(cmd_path, path);
     return;
   }
@@ -417,7 +412,7 @@ void cmd_cd(const char *path) {
     current_cluster = cluster;
     strcpy(cmd_path, path);
   } else
-    fprintf(stderr, "Error: No such directory: %s\n", path);
+    fprintf(stderr, "ERROR: No such directory: %s\n", path);
 }
 
 void cmd_format() {
@@ -432,7 +427,7 @@ void cmd_ls(const char *path) {
     DirEntry dir_entry;
     dir_cluster = find_file_or_dir_full_path(path, &dir_entry);
     if (!dir_cluster || dir_entry.attributes & 0x10 == 0) {
-      fprintf(stderr, "Error: No such directory: %s\n", path);
+      fprintf(stderr, "ERROR: No such directory: %s\n", path);
       return;
     }
   }
@@ -451,7 +446,6 @@ void cmd_ls(const char *path) {
       strncpy(entry_name, entries[i].name, 11);
       entry_name[11] = '\0';
 
-      // Якщо файл має атрибут каталогу, додаємо сліш в кінці імені
       if (entries[i].attributes & ATTR_DIRECTORY)
         strcat(entry_name, "/");
 
@@ -463,14 +457,13 @@ void cmd_ls(const char *path) {
 }
 
 void cmd_mkdir(const char *name) {
-  // Перевірка, чи ім'я каталогу валідне
   if (strlen(name) > 11) {
-    fprintf(stderr, "Error: Invalid directory name: %s\n", name);
+    fprintf(stderr, "ERROR: Invalid directory name: %s\n", name);
     return;
   }
 
   if (find_file_or_dir(name, current_cluster, NULL)) {
-    fprintf(stderr, "Error: File or Directory already exists: %s\n", name);
+    fprintf(stderr, "ERROR: File or Directory already exists: %s\n", name);
     return;
   }
 
@@ -478,7 +471,7 @@ void cmd_mkdir(const char *name) {
       get_write_cluster_for_dir_entry(current_cluster);
 
   if (!parent_dir_cluster) {
-    fprintf(stderr, "Error: No free clusters available.\n");
+    fprintf(stderr, "ERROR: No free clusters available.\n");
     return;
   }
 
@@ -494,41 +487,35 @@ void cmd_mkdir(const char *name) {
   }
 
   if (free_entry_index == -1) {
-    fprintf(stderr, "Error: Program error.\n");
+    fprintf(stderr, "ERROR: Program error.\n");
     return;
   }
-
-  // Знаходження вільного кластера
   uint32_t new_dir_cluster = find_free_cluster();
   if (new_dir_cluster == 0) {
-    fprintf(stderr, "Error: No free clusters available.\n");
+    fprintf(stderr, "ERROR: No free clusters available.\n");
     return;
   }
 
-  // Створення нового каталогу
   DirEntry new_dir;
   memset(&new_dir, 0, sizeof(new_dir));
   strncpy(new_dir.name, name, 11);
-  new_dir.attributes = 0x10; // Атрибут каталогу
+  new_dir.attributes = 0x10;
   new_dir.first_cluster_low = new_dir_cluster & 0xFFFF;
   new_dir.first_cluster_high = (new_dir_cluster >> 16) & 0xFFFF;
 
-  // Запис нового запису в каталог
   entries[free_entry_index] = new_dir;
   write_dir_entries(parent_dir_cluster, entries);
 
-  // Позначити кластер як кінець кластера в FAT
   write_fat_entry(new_dir_cluster, FAT32_EOC);
 
-  // add catalogues
   memset(entries, 0, sizeof(DirEntry) * DIR_SIZE);
   strncpy(entries[0].name, ".", 11);
-  entries[0].attributes = 0x10; // Атрибут каталогу
+  entries[0].attributes = 0x10;
   entries[0].first_cluster_low = new_dir_cluster & 0xFFFF;
   entries[0].first_cluster_high = (new_dir_cluster >> 16) & 0xFFFF;
 
   strncpy(entries[1].name, "..", 11);
-  entries[1].attributes = 0x10; // Атрибут каталогу
+  entries[1].attributes = 0x10;
   entries[1].first_cluster_low = parent_dir_cluster & 0xFFFF;
   entries[1].first_cluster_high = (parent_dir_cluster >> 16) & 0xFFFF;
 
@@ -538,14 +525,13 @@ void cmd_mkdir(const char *name) {
 }
 
 void cmd_touch(const char *name) {
-  // Перевірка, чи ім'я файлу валідне
   if (strlen(name) > 11) {
-    fprintf(stderr, "Error: Invalid file name: %s\n", name);
+    fprintf(stderr, "ERROR: Invalid file name: %s\n", name);
     return;
   }
 
   if (find_file_or_dir(name, current_cluster, NULL)) {
-    fprintf(stderr, "Error: File or Directory already exists: %s\n", name);
+    fprintf(stderr, "ERROR: File or Directory already exists: %s\n", name);
     return;
   }
 
@@ -553,7 +539,7 @@ void cmd_touch(const char *name) {
       get_write_cluster_for_dir_entry(current_cluster);
 
   if (!parent_dir_cluster) {
-    fprintf(stderr, "Error: No free clusters available.\n");
+    fprintf(stderr, "ERROR: No free clusters available.\n");
     return;
   }
 
@@ -569,7 +555,7 @@ void cmd_touch(const char *name) {
   }
 
   if (free_entry_index == -1) {
-    fprintf(stderr, "Error: Program error.\n");
+    fprintf(stderr, "ERROR: Program error.\n");
     return;
   }
 
