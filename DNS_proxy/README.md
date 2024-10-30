@@ -10,6 +10,7 @@ The DNS_proxy proxy project is a simple multithreaded DNS proxy server implement
 
 ## Dependencies
 
+* [GCC 11.4.0](https://gcc.gnu.org/gcc-11/)
 * [CMake 3.5.0](https://cmake.org/download/) _(or higher)_
 * [Check 0.15.2](https://github.com/libcheck/check/releases) _(for unit testing)_
 * [Valgrind 3.15.0](https://valgrind.org/docs/manual/dist.readme.html) _(for memory leak detection)_
