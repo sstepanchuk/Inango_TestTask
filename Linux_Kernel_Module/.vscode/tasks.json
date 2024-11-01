@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Build qemu x86 kernel",
+        "type": "shell",
+        "command": "make", 
+        "args": [
+          "-C", 
+          "${workspaceFolder}", 
+          "ARCH=x86_64", 
+          "CROSS_COMPILE=gcc" 
+        ],
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "problemMatcher": "$gcc"
+      }
+    ]
+}

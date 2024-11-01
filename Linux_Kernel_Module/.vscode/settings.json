@@ -1,18 +1,45 @@
 {
-    "files.associations": {
-        "*.conf": "bitbake",
-        "*.inc": "bitbake"
-    },
-    "bitbake.pathToBuildFolder": "${workspaceFolder}/build",
-    "bitbake.pathToEnvScript": "${workspaceFolder}poky/oe-init-build-env",
-    "bitbake.pathToBitbakeFolder": "${workspaceFolder}/poky/bitbake",
-    "python.autoComplete.extraPaths": [
-        "${workspaceFolder}/poky/bitbake/lib",
-        "${workspaceFolder}/poky/meta/lib"
-    ],
-    "python.analysis.extraPaths": [
-        "${workspaceFolder}/poky/bitbake/lib",
-        "${workspaceFolder}/poky/meta/lib"
-    ],
-    "bitbake.sdkImage": "core-image-minimal",
+  "files.exclude": {
+    "./poky/**/*": true,
+    "./build/cache/**/*": true,
+    "./build/downloads/**/*": true,
+    "./build/sstate-cache/**/*": true,
+    "./build/tmp/**/*": true,
+  },
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "editor.defaultFormatter": "xaver.clang-format",
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": false,
+  "C_Cpp.autoAddFileAssociations": false,
+  "C_Cpp.loggingLevel": "Debug",
+  "C_Cpp.intelliSenseEngine": "Tag Parser",
+  "C_Cpp.default.compilerPath": "/usr/bin/gcc",
+  "C_Cpp.default.intelliSenseMode": "linux-gcc-x86",
+  "C_Cpp.default.cStandard": "gnu89",
+  "C_Cpp.default.defines": [],
+  "C_Cpp.default.includePath": [
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-source/arch/x86/include",
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-build-artifacts/arch/x86/include/generated",
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-source/include",
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-source/arch/x86/include/uapi",
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-source/include/uapi",
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-build-artifacts/arch/x86/include/generated/uapi",
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-build-artifacts/include",
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-build-artifacts/include/generated/uapi"
+  ],
+  "C_Cpp.default.browse.path": [
+    "${workspaceFolder}/src",
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-source/arch/x86/include",
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-build-artifacts/arch/x86/include/generated",
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-source/include",
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-source/arch/x86/include/uapi",
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-source/include/uapi",
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-build-artifacts/arch/x86/include/generated/uapi",
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-build-artifacts/include",
+    "${workspaceFolder}/build/tmp/work-shared/qemux86/kernel-build-artifacts/include/generated/uapi"
+  ],
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
 }
