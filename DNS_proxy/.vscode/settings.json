@@ -1,5 +1,11 @@
 {
   "editor.formatOnSave": true,
   "editor.tabSize": 2,
-  "editor.defaultFormatter": "xaver.clang-format"
+  "editor.defaultFormatter": "xaver.clang-format",
+  "terminal.integrated.scrollback": 1000000000,
+  "files.associations": {
+    "unistd.h": "c",
+    "time.h": "c"
+  },
+  
 }

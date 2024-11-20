@@ -23,7 +23,7 @@ unsigned short add_dns_packet(struct DnsPacketHashEntry hentry);
 
 unsigned char get_dns_packet(unsigned short key,
                              struct DnsPacketHashEntry *out_entry);
-
+void full_remove_dns_packet(unsigned short key);
 void free_dns_packet_list();
 
 #endif

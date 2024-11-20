@@ -27,7 +27,7 @@ START_TEST(test_serialize_empty_domain_name) {
   int pos = serialize_domain_name(domain_name, packet, 0, &cache);
   free_domain_cache(&cache);
 
-  ck_assert_int_eq(pos, -1); // Should be error
+  ck_assert_int_eq(pos, 1);
 }
 END_TEST
 

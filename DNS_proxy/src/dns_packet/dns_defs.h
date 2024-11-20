@@ -26,6 +26,9 @@
 #define DNS_TYPE_TXT 0x0010   // Text strings
 #define DNS_TYPE_AAAA 0x001C  // IPv6 address
 #define DNS_TYPE_SRV 0x0021   // Service locator
+#define DNS_TYPE_RRSIG 0x002E // Resource Record Signature (DNSSEC)
+#define DNS_TYPE_NSEC 0x002F  // Next Secure (DNSSEC)
+#define DNS_TYPE_CAA 0x0101   // Certification Authority Authorization
 
 // QTYPE values used only in DNS queries (RFC 1035 and beyond)
 #define DNS_QTYPE_AXFR 0x00FC  // Transfer of entire zone
@@ -66,6 +69,20 @@
 #define DNS_OPCODE_STATUS 0x2 // Server status request (deprecated)
 #define DNS_OPCODE_NOTIFY 0x3 // Notify message (used in DNS zone transfers)
 #define DNS_OPCODE_UPDATE 0x4 // Dynamic update request
+
+#define DNS_PACKET_PRINT_ERRORS
+#ifdef DNS_PACKET_PRINT_ERRORS
+#include "error_utils.h"
+
+#define SET_DNS_ERROR(str, ...)                                                \
+  do {                                                                         \
+    SET_ERROR(str, ##__VA_ARGS__);                                             \
+  } while (0)
+#else
+#define SET_DNS_ERROR(str, ...)                                                \
+  do {                                                                         \
+  } while (0)
+#endif
 
 typedef struct {
   unsigned short id; // Ідентифікаційний номер

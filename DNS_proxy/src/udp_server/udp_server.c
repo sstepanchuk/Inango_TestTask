@@ -57,8 +57,10 @@ void udp_server_destroy(UdpServer *server) {
 void udp_server_listen(UdpServer *server, RequestResolveHandler handler,
                        void *context) // Можна тільки в одному потоці
 {
-  Request request;
+  static Request request = {.buffer = NULL};
   request.addr_len = sizeof(request.client_addr);
+  if (!request.buffer)
+    request.buffer = malloc(SERVER_BUFFER_SIZE);
 
   request.packet_size =
       recvfrom(server->sockfd, request.buffer, (size_t)SERVER_BUFFER_SIZE, 0,
@@ -66,6 +68,7 @@ void udp_server_listen(UdpServer *server, RequestResolveHandler handler,
 
   if (request.packet_size > 0) {
     handler(server, request, context);
+    request.buffer = NULL;
   } else if (errno != EAGAIN && errno != EWOULDBLOCK)
     perror("Помилка recvfrom");
 }

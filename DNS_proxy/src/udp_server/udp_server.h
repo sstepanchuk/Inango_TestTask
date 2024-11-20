@@ -4,12 +4,13 @@
 #include "dns_defs.h"
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <unistd.h>
 
 #define SERVER_BUFFER_SIZE MAX_DNS_PACKET_SIZE
 
 typedef struct {
   struct sockaddr_in client_addr;
-  unsigned char buffer[SERVER_BUFFER_SIZE];
+  unsigned char *buffer;
   int packet_size;
   socklen_t addr_len;
 } Request;

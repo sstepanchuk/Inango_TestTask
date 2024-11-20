@@ -27,7 +27,7 @@ foreach (lib IN LISTS LIBS)
   add_subdirectory("${SOURCE_DIR}/${lib}")
 endforeach()
 add_subdirectory(tests)
-
+add_subdirectory(stress_test)
 # Add the executable
 add_executable(${PROJECT_NAME} "${SOURCE_DIR}/main.c")
 
@@ -39,4 +39,5 @@ include(FindValgrind)
 add_custom_target("${PROJECT_NAME}_memory_leak_check"
   COMMAND ${VALGRIND_PROGRAM} --leak-check=full $<TARGET_FILE:${PROJECT_NAME}>
   DEPENDS ${PROJECT_NAME}
+  WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
 )

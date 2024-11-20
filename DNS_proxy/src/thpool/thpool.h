@@ -11,11 +11,10 @@
 extern "C" {
 #endif
 
-/* =================================== API ======================================= */
+/* =================================== API
+ * ======================================= */
 
-
-typedef struct thpool_* threadpool;
-
+typedef struct thpool_ *threadpool;
 
 /**
  * @brief  Initialize threadpool
@@ -27,7 +26,8 @@ typedef struct thpool_* threadpool;
  *
  *    ..
  *    threadpool thpool;                     //First we declare a threadpool
- *    thpool = thpool_init(4);               //then we initialize it to 4 threads
+ *    thpool = thpool_init(4);               //then we initialize it to 4
+ * threads
  *    ..
  *
  * @param  num_threads   number of threads to be created in the threadpool
@@ -35,7 +35,6 @@ typedef struct thpool_* threadpool;
  *                       NULL on error
  */
 threadpool thpool_init(int num_threads);
-
 
 /**
  * @brief Add work to the job queue
@@ -64,8 +63,7 @@ threadpool thpool_init(int num_threads);
  * @param  arg_p         pointer to an argument
  * @return 0 on success, -1 otherwise.
  */
-int thpool_add_work(threadpool, void (*function_p)(void*), void* arg_p);
-
+int thpool_add_work(threadpool, void (*function_p)(void *), void *arg_p);
 
 /**
  * @brief Wait for all queued jobs to finish
@@ -96,7 +94,6 @@ int thpool_add_work(threadpool, void (*function_p)(void*), void* arg_p);
  */
 void thpool_wait(threadpool);
 
-
 /**
  * @brief Pauses all threads immediately
  *
@@ -120,7 +117,6 @@ void thpool_wait(threadpool);
  */
 void thpool_pause(threadpool);
 
-
 /**
  * @brief Unpauses all threads if they are paused
  *
@@ -135,7 +131,6 @@ void thpool_pause(threadpool);
  * @return nothing
  */
 void thpool_resume(threadpool);
-
 
 /**
  * @brief Destroy the threadpool
@@ -158,7 +153,6 @@ void thpool_resume(threadpool);
  */
 void thpool_destroy(threadpool);
 
-
 /**
  * @brief Show currently working threads
  *
@@ -179,6 +173,47 @@ void thpool_destroy(threadpool);
  */
 int thpool_num_threads_working(threadpool);
 
+/* ========================== STRUCTURES ============================ */
+
+/* Binary semaphore */
+typedef struct bsem {
+  pthread_mutex_t mutex;
+  pthread_cond_t cond;
+  int v;
+} bsem;
+
+/* Job */
+typedef struct job {
+  struct job *prev;            /* pointer to previous job   */
+  void (*function)(void *arg); /* function pointer          */
+  void *arg;                   /* function's argument       */
+} job;
+
+/* Job queue */
+typedef struct jobqueue {
+  pthread_mutex_t rwmutex; /* used for queue r/w access */
+  job *front;              /* pointer to front of queue */
+  job *rear;               /* pointer to rear  of queue */
+  bsem *has_jobs;          /* flag as binary semaphore  */
+  int len;                 /* number of jobs in queue   */
+} jobqueue;
+
+/* Thread */
+typedef struct thread {
+  int id;                   /* friendly id               */
+  pthread_t pthread;        /* pointer to actual thread  */
+  struct thpool_ *thpool_p; /* access to thpool          */
+} thread;
+
+/* Threadpool */
+typedef struct thpool_ {
+  thread **threads;                 /* pointer to threads        */
+  volatile int num_threads_alive;   /* threads currently alive   */
+  volatile int num_threads_working; /* threads currently working */
+  pthread_mutex_t thcount_lock;     /* used for thread count etc */
+  pthread_cond_t threads_all_idle;  /* signal to thpool_wait     */
+  jobqueue jobqueue;                /* job queue                 */
+} thpool_;
 
 #ifdef __cplusplus
 }

@@ -12,7 +12,7 @@ START_TEST(successful_parse) {
   };
   DnsQuery *queries = NULL;
   unsigned short count = 1;
-  int pos = parse_dns_queries(packet, &queries, sizeof(packet), pos, count);
+  int pos = parse_dns_queries(packet, &queries, sizeof(packet), 0, count);
 
   ck_assert_int_eq(pos,
                    sizeof(packet)); // Position should be at the end of packet

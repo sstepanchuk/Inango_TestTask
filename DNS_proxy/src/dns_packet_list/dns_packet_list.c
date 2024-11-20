@@ -46,6 +46,18 @@ unsigned char get_dns_packet(unsigned short key,
   return 0; // Return NULL if not found
 }
 
+void full_remove_dns_packet(unsigned short key) {
+  struct DnsPacketHashEntry *entry;
+  pthread_mutex_lock(&cached_dns_mutex);
+  HASH_FIND(hh, cached_dns_packets, &key, sizeof(key), entry);
+
+  if (entry != NULL) {
+    HASH_DEL(cached_dns_packets, entry);
+    free(entry);
+  }
+  pthread_mutex_unlock(&cached_dns_mutex);
+}
+
 void free_dns_packet_list() {
   pthread_mutex_lock(&cached_dns_mutex);
   struct DnsPacketHashEntry *tmp, *p;

@@ -1,26 +1,57 @@
 #include "main.h"
 
-void dns_server_response_handler(DNSRequestContext *context) {
-  DnsPacket *packet = context->packet;
-  struct DnsPacketHashEntry out_entry;
+#if ENABLE_STATS
 
-  if (get_dns_packet(packet->header.id, &out_entry)) {
-
-    unsigned char buffer[512];
-    packet->header.id = out_entry.value->header.id;
-
-    int size = serialize_dns_packet(packet, buffer);
-    if (sendto(context->server->server->sockfd, buffer, size, 0,
-               (struct sockaddr *)&out_entry.client_addr,
-               out_entry.addr_len) < 0)
-      perror("Sendto failed");
-    else
-      printf("Successfully return proxied\n");
-
-    free_dns_packet(out_entry.value);
+void speedtester(ServerContext *servercontext) {
+  clock_gettime(CLOCK_MONOTONIC, &servercontext->gstats.prev_time);
+  while (1) {
+    sleep(INTERVAL);
+    calculate_and_print_traffic_speed(&servercontext->gstats,
+                                      servercontext->requests_thpool,
+                                      servercontext->response_thpool);
   }
+}
+#endif
 
-  free_dns_packet(packet);
+void dns_server_response_handler(DNSRequestContext *context) {
+  DnsPacket *packet =
+      parse_dns_packet(context->request.buffer, context->request.packet_size);
+
+  if (packet) {
+    struct DnsPacketHashEntry out_entry;
+
+    if (get_dns_packet(packet->header.id, &out_entry)) {
+      unsigned char buffer[512];
+      packet->header.id = out_entry.value->header.id;
+
+      int size = serialize_dns_packet(packet, buffer);
+
+      if (size > 0) {
+        if (sendto(context->server->server->sockfd, buffer, size, 0,
+                   (struct sockaddr *)&out_entry.client_addr,
+                   out_entry.addr_len) < 0) {
+          print_sockaddr_in(&out_entry.client_addr);
+          perror("Sendto failed");
+        } else {
+#if ENABLE_STATS
+          pthread_mutex_lock(&context->server->gstats.lock);
+          context->server->gstats.total_tx_bytes += size;
+          pthread_mutex_unlock(&context->server->gstats.lock);
+#else
+          printf("Successfully return proxied\n");
+#endif
+        }
+      } else {
+        printf("Serialization message from upstream failed\n");
+        print_dns_packet(packet);
+      }
+
+      free_dns_packet(out_entry.value);
+    }
+
+    free_dns_packet(packet);
+  }
+  free(context->request.buffer);
   free(context);
 }
 
@@ -103,12 +134,26 @@ unsigned char clean_packet(DnsPacket *packet, DNSRequestContext *context) {
 
     unsigned char buffer[512];
     int size = serialize_dns_packet(blocked_response, buffer);
-    if (sendto(context->server->server->sockfd, buffer, size, 0,
-               (struct sockaddr *)&context->client_addr, context->addr_len) < 0)
-      perror("Sendto block failed");
-    else
-      for (unsigned short i = 0; i < blocked_response->header.q_count; i++)
-        printf("Domain blocked: %s\n", blocked_response->queries[i].name);
+    if (size > 0) {
+      if (sendto(context->server->server->sockfd, buffer, size, 0,
+                 (struct sockaddr *)&context->request.client_addr,
+                 context->request.addr_len) < 0) {
+        print_sockaddr_in(&context->request.client_addr);
+        perror("Sendto block failed");
+      } else {
+#if ENABLE_STATS
+        pthread_mutex_lock(&context->server->gstats.lock);
+        context->server->gstats.total_tx_bytes += size;
+        pthread_mutex_unlock(&context->server->gstats.lock);
+#else
+        for (unsigned short i = 0; i < blocked_response->header.q_count; i++)
+          printf("Domain blocked: %s\n", blocked_response->queries[i].name);
+#endif
+      }
+    } else {
+      printf("Serialization block message failed\n");
+      print_dns_packet(blocked_response);
+    }
 
     free_dns_packet(blocked_response);
   }
@@ -117,73 +162,88 @@ unsigned char clean_packet(DnsPacket *packet, DNSRequestContext *context) {
 }
 
 void proxy_incomming_request_handler(DNSRequestContext *context) {
-  static unsigned short cached_dns_id = 0;
+  DnsPacket *packet =
+      parse_dns_packet(context->request.buffer, context->request.packet_size);
 
-  DnsPacket *packet = context->packet;
+  if (packet) {
+#if ENABLE_STATS
+    pthread_mutex_lock(&context->server->gstats.lock);
+    context->server->gstats.total_packets += 1;
+    pthread_mutex_unlock(&context->server->gstats.lock);
+#endif
 
-  // Check is in black list
-  clean_packet(packet, context);
+    // Check is in black list
+    clean_packet(packet, context);
 
-  if (packet->header.q_count > 0) {
+    if (packet->header.q_count > 0) {
+      unsigned short packet_id_temp = packet->header.id;
+      packet->header.id = add_dns_packet(
+          (struct DnsPacketHashEntry){0, packet, context->request.client_addr,
+                                      context->request.addr_len, time(NULL)});
 
-    unsigned short packet_id_temp = packet->header.id;
-    packet->header.id = add_dns_packet((struct DnsPacketHashEntry){
-        0, packet, context->client_addr, context->addr_len, time(NULL)});
+      unsigned char buffer[512];
+      int size = serialize_dns_packet(packet, buffer);
+      if (size > 0) {
+        packet->header.id = packet_id_temp;
 
-    unsigned char buffer[512];
-    int size = serialize_dns_packet(packet, buffer);
-    packet->header.id = packet_id_temp;
+        if (sendto(
+                context->server->server->sockfd, buffer, size, 0,
+                (struct sockaddr *)&context->server->cfg.upstreamdns_ipaddress,
+                sizeof(struct sockaddr_in)) < 0) {
+          print_sockaddr_in(&context->request.client_addr);
+          perror("Sendto upstream failed");
+        } else {
+#if ENABLE_STATS
+          pthread_mutex_lock(&context->server->gstats.lock);
+          context->server->gstats.total_tx_bytes += size;
+          pthread_mutex_unlock(&context->server->gstats.lock);
+#else
+          printf("Successfully proxied\n");
+#endif
+        }
+      } else {
+        full_remove_dns_packet(packet->header.id);
 
-    if (sendto(context->server->server->sockfd, buffer, size, 0,
-               (struct sockaddr *)&context->server->cfg.upstreamdns_ipaddress,
-               sizeof(struct sockaddr_in)) < 0)
-      perror("Sendto failed");
-    else
-      printf("Successfully proxied\n");
+        packet->header.id = packet_id_temp;
 
-    /*pthread_mutex_lock(&cached_dns_mutex);
-    printf("New incomming packet with incorrect id: %hu should be: %hu\n",
-           result, cached_dns_id++);
-    pthread_mutex_unlock(&cached_dns_mutex);*/
-  } else
-    free_dns_packet(packet);
+        printf("Serialization message to upstream failed\n");
+        print_dns_packet(packet);
+        free_dns_packet(packet);
+      }
+    } else
+      free_dns_packet(packet);
+  }
 
+  free(context->request.buffer);
   free(context);
 }
 
 void request_handler(UdpServer *server, Request request,
                      ServerContext *servercontext) {
-  DnsPacket *packet = parse_dns_packet(request.buffer, request.packet_size);
-  if (packet == NULL)
+#if ENABLE_STATS
+  pthread_mutex_lock(&servercontext->gstats.lock);
+  servercontext->gstats.total_rx_bytes += request.packet_size;
+  pthread_mutex_unlock(&servercontext->gstats.lock);
+#endif
+  DnsHeader header;
+
+  if (parse_dns_header(request.buffer, request.packet_size, &header) > 0) {
+    free(request.buffer);
     return;
+  }
 
-  /* unsigned char buffer[MAX_DNS_PACKET_SIZE];
-
-   int size = serialize_dns_packet(packet, buffer);
-   printf("In size: %d / Out size: %d", request.packet_size, size);
-
-   if (sendto(server->sockfd, buffer, size, 0,
-              (struct sockaddr *)&request.client_addr, request.addr_len) < 0)
-     perror("Sendto failed");
-   else
-     printf("Successfully return proxied");
-
-   free_dns_packet(packet);*/
-
-  if (packet->header.qr &&
+  if (header.qr &&
       request.client_addr.sin_addr.s_addr !=
           servercontext->cfg.upstreamdns_ipaddress.sin_addr.s_addr) {
-    free_dns_packet(packet);
+    free(request.buffer);
     return;
   }
 
   DNSRequestContext *request_context = malloc(sizeof(DNSRequestContext));
   request_context->server = servercontext;
-  request_context->packet = packet;
-  request_context->client_addr = request.client_addr;
-  request_context->addr_len = request.addr_len;
+  request_context->request = request;
 
-  if (packet->header.qr)
+  if (header.qr)
     thpool_add_work(servercontext->response_thpool,
                     (void (*)(void *))dns_server_response_handler,
                     (void *)request_context);
@@ -192,20 +252,15 @@ void request_handler(UdpServer *server, Request request,
                     (void (*)(void *))proxy_incomming_request_handler,
                     (void *)request_context);
 }
-// Кастомний обробник запитів
-// void speedtester(void *arg) {
-//  while (1) {
-//    sleep(INTERVAL);
-//    calculate_and_print_traffic_speed(gstats);
-//  }
-//}
 
 void free_proxy(ServerContext *servercontext) {
   thpool_destroy(servercontext->requests_thpool);
   thpool_destroy(servercontext->response_thpool);
   if (servercontext->server)
     udp_server_destroy(servercontext->server);
+#if ENABLE_STATS
   pthread_mutex_destroy(&servercontext->gstats.lock);
+#endif
   free_dns_packet_list();
   pthread_mutex_destroy(&cached_dns_mutex);
   free_config(&servercontext->cfg);
@@ -224,8 +279,14 @@ int main() {
   server_context.requests_thpool = thpool_init(MAX_THREADS / 2);
   server_context.response_thpool = thpool_init(MAX_THREADS / 2);
   server_context.server =
-      udp_server_create(server_context.cfg.server_port, 1024 * 1024, 0);
+      udp_server_create(server_context.cfg.server_port, 1024 * 1024 * 1024, 0);
   pthread_mutex_init(&cached_dns_mutex, NULL);
+
+#if ENABLE_STATS
+  pthread_mutex_init(&server_context.gstats.lock, NULL);
+  thpool_add_work(server_context.response_thpool, (void (*)(void *))speedtester,
+                  (void *)&server_context);
+#endif
 
   if (!server_context.server) {
     fprintf(stderr, "Can't create server on 0.0.0.0:%hu\n",

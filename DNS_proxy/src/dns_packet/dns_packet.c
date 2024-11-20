@@ -1,6 +1,11 @@
 #include "dns_packet.h"
 
 unsigned char parse_dns_rcode(const char *rcode_str, unsigned char *rcode_out) {
+  if (!rcode_str || !rcode_out) { // Перевірка вказівників на валідність
+    SET_DNS_ERROR("Invalid input pointers");
+    return 0;
+  }
+
   if (strcmp(rcode_str, "NOERROR") == 0) {
     *rcode_out = DNS_RCODE_NOERROR;
   } else if (strcmp(rcode_str, "FORMERR") == 0) {
@@ -33,14 +38,28 @@ unsigned char parse_dns_rcode(const char *rcode_str, unsigned char *rcode_out) {
     *rcode_out = DNS_RCODE_BADMODE;
   } else if (strcmp(rcode_str, "BADALG") == 0) {
     *rcode_out = DNS_RCODE_BADALG;
-  } else
+  } else {
+    SET_DNS_ERROR("Invalid RCODE: %s",
+                  rcode_str); // Додано обробку помилки з деталями
     return 0;
+  }
 
   return 1;
 }
 
 char parse_dns_header(const unsigned char *packet, const int packet_size,
                       DnsHeader *header_out) {
+
+  if (!packet || !header_out) { // Перевірка вказівників на валідність
+    SET_DNS_ERROR("Invalid input pointers");
+    return -1;
+  }
+
+  if (packet_size < sizeof(DnsHeader)) { // Перевірка розміру пакета
+    SET_DNS_ERROR("Packet size is too small");
+    return -1;
+  }
+
   const DnsHeader *in_dns_header = (const DnsHeader *)packet;
   memcpy(header_out, packet, sizeof(DnsHeader));
 
@@ -52,7 +71,7 @@ char parse_dns_header(const unsigned char *packet, const int packet_size,
   header_out->add_count = ntohs(in_dns_header->add_count);
 
   if (!validate_dns_header(header_out, packet_size))
-    return -1; // Недійсна кількість
+    return -1;
 
   return 0;
 }
@@ -62,31 +81,51 @@ char parse_dns_header(const unsigned char *packet, const int packet_size,
 int parse_domain_name_recursive(const unsigned char *packet,
                                 const int packet_size, int pos,
                                 char *parsed_name, int *name_length) {
+
+  if (!packet || !parsed_name || !name_length) { // Перевірка вказівників
+    SET_DNS_ERROR("Invalid input pointers");
+    return -1;
+  }
+
+  if (pos >= packet_size) { // Перевірка позиції
+    SET_DNS_ERROR("Position out of bounds: %d (packet size: %d)", pos,
+                  packet_size);
+    return -1;
+  }
+
   int label_length;
 
-  if (pos >= packet_size)
-    return -1;
-
-  if ((packet[pos] & 0xC0) == 0xC0) {
+  if ((packet[pos] & 0xC0) == 0xC0) { // Стиснення вказівника
     unsigned short offset = ntohs(*(unsigned short *)(packet + pos)) & 0x3FFF;
-    if (parse_domain_name_recursive(packet, packet_size, offset, parsed_name,
-                                    name_length) < 0)
+    if (offset >= packet_size) { // Перевірка зміщення
+      SET_DNS_ERROR("Invalid compression offset: %d (packet size: %d)", offset,
+                    packet_size);
       return -1;
+    }
+    if (parse_domain_name_recursive(packet, packet_size, offset, parsed_name,
+                                    name_length) < 0) {
+      return -1; // Помилка вже оброблена в рекурсивному виклику
+    }
     return pos + sizeof(unsigned short);
   }
 
   label_length = (unsigned char)packet[pos];
-  if (label_length == 0) {
+  if (label_length == 0) { // Кінець доменного імені
     ++pos;
     return pos;
   }
 
   if (label_length > MAX_LABEL_LENGTH ||
-      *name_length + label_length >= MAX_DOMAIN_LENGTH + 1)
+      *name_length + label_length >= MAX_DOMAIN_LENGTH + 1) {
+    SET_DNS_ERROR("Label length exceeds limit: %d (max: %d)", label_length,
+                  MAX_LABEL_LENGTH);
     return -1;
+  }
 
-  if (!validate_label(packet + pos + 1, label_length))
+  if (!validate_label(packet + pos + 1, label_length)) {
+    SET_DNS_ERROR("Invalid label at position %d", pos);
     return -1;
+  }
 
   memcpy(parsed_name + *name_length, packet + pos + 1, label_length);
   *name_length += label_length;
@@ -99,21 +138,30 @@ int parse_domain_name_recursive(const unsigned char *packet,
 
 int _parse_domain_name(const unsigned char *packet, const int packet_size,
                        int pos, char *parsed_name) {
-  int name_length = 0;
 
-  if (!parsed_name)
+  if (!packet || !parsed_name) {
+    SET_DNS_ERROR("Invalid input pointers");
     return -1;
+  }
+
+  if (pos < 0 || pos >= packet_size) {
+    SET_DNS_ERROR("Invalid position: %d (packet size: %d)", pos, packet_size);
+    return -1;
+  }
+
+  int name_length = 0;
+  parsed_name[0] = '\0';
 
   int result = parse_domain_name_recursive(packet, packet_size, pos,
                                            parsed_name, &name_length);
 
-  if (result < 0)
+  if (result < 0) {
     return -1;
+  }
 
-  if (name_length > 0)
+  if (name_length > 0) {
     parsed_name[name_length - 1] = '\0';
-  else
-    return -1;
+  }
 
   return result;
 }
@@ -121,8 +169,10 @@ int _parse_domain_name(const unsigned char *packet, const int packet_size,
 int parse_domain_name(const unsigned char *packet, const int packet_size,
                       int pos, char **name) {
   char *parsed_name = malloc(MAX_DOMAIN_LENGTH + 1);
-  if (!parsed_name)
+  if (!parsed_name) {
+    SET_DNS_ERROR("Memory allocation failed");
     return -1;
+  }
 
   int result = _parse_domain_name(packet, packet_size, pos, parsed_name);
 
@@ -139,8 +189,10 @@ int parse_dns_queries(const unsigned char *packet, DnsQuery **_queries,
                       const int packet_size, int pos,
                       const unsigned short count) {
   *_queries = malloc(count * sizeof(DnsQuery));
-  if (!*_queries)
+  if (!*_queries) {
+    SET_DNS_ERROR("Memory allocation failed");
     return -1;
+  }
   DnsQuery *queries = *_queries;
 
   for (int i = 0; i < count; i++) {
@@ -159,6 +211,8 @@ int parse_dns_queries(const unsigned char *packet, DnsQuery **_queries,
 
         !validate_qclass(queries[i].ques.qclass =
                              ntohs(*(unsigned short *)(packet + pos + 2)))) {
+      for (int j = 0; j < i; j++)
+        free(queries[j].name);
       free(queries[i].name);
       free(queries);
       return -1;
@@ -171,22 +225,31 @@ int parse_dns_queries(const unsigned char *packet, DnsQuery **_queries,
 
 int parse_soa_record(const unsigned char *packet, int packet_size, int pos,
                      SOARecord *soa) {
-  if (pos >= packet_size)
-    return -1; // Check for bounds
+  if (!packet || !soa) {
+    SET_DNS_ERROR("Invalid input pointers");
+    return -1;
+  }
 
-  // Parse Primary Name Server
+  if (pos >= packet_size) {
+    SET_DNS_ERROR("Position out of bounds: %d (packet size: %d)", pos,
+                  packet_size);
+    return -1;
+  }
+
   pos = _parse_domain_name(packet, packet_size, pos, soa->primary_ns);
-  if (pos < 0)
+  if (pos < 0) {
     return -1;
+  }
 
-  // Parse Responsible Email
   pos = _parse_domain_name(packet, packet_size, pos, soa->responsible_email);
-  if (pos < 0)
+  if (pos < 0) {
     return -1;
+  }
 
-  // Read Serial, Refresh, Retry, Expire, Minimum TTL
-  if (pos + 20 > packet_size)
-    return -1; // Check bounds for 5 * 4-byte fields
+  if (pos + 20 > packet_size) {
+    SET_DNS_ERROR("Not enough data for SOA record");
+    return -1;
+  }
 
   soa->serial = ntohl(*(uint32_t *)(packet + pos));
   pos += 4;
@@ -199,46 +262,59 @@ int parse_soa_record(const unsigned char *packet, int packet_size, int pos,
   soa->minimum_ttl = ntohl(*(uint32_t *)(packet + pos));
   pos += 4;
 
-  return pos; // Return the new position after parsing
+  return pos;
 }
 
 int parse_mx_record(const unsigned char *packet, int packet_size, int pos,
                     MXRecord *mx) {
-  if (pos >= packet_size)
-    return -1; // Check for bounds
 
-  // Read Preference
-  if (pos + 2 > packet_size)
-    return -1; // Check bounds for 2-byte field
+  if (!packet || !mx) {
+    SET_DNS_ERROR("Invalid input pointers");
+    return -1;
+  }
+
+  if (pos >= packet_size) {
+    SET_DNS_ERROR("Position out of bounds: %d (packet size: %d)", pos,
+                  packet_size);
+    return -1;
+  }
+
+  if (pos + 2 > packet_size) {
+    SET_DNS_ERROR("Not enough data for MX record");
+    return -1;
+  }
 
   mx->preference = ntohs(*(uint16_t *)(packet + pos));
   pos += 2;
 
-  // Parse Mail Exchange Domain Name
   pos = _parse_domain_name(packet, packet_size, pos, mx->primary_ns);
-  if (pos < 0)
+  if (pos < 0) {
     return -1;
+  }
 
-  return pos; // Return the new position after parsing
+  return pos;
 }
 
 int parse_dns_answers(const unsigned char *packet, DnsAnswer **_answers,
                       const int packet_size, int pos,
                       const unsigned short count) {
   *_answers = malloc(count * sizeof(DnsAnswer));
-  if (!*_answers)
+  if (!*_answers) {
+    SET_DNS_ERROR("Memory allocation failed");
     return -1;
+  }
 
   DnsAnswer *answers = *_answers;
   for (int i = 0; i < count; i++) {
     if ((pos = parse_domain_name(packet, packet_size, pos, &answers[i].name)) <
         0) {
+      SET_DNS_ERROR("Error parsing domain name in [%d] DNS answer", i);
       for (int j = 0; j < i; j++) {
         free(answers[j].name);
         free(answers[j].data);
       }
       free(answers);
-      return -1; // Помилка при розборі доменного імені відповіді
+      return -1;
     }
 
     if (pos + 10 > packet_size ||
@@ -248,6 +324,7 @@ int parse_dns_answers(const unsigned char *packet, DnsAnswer **_answers,
 
         !validate_class(answers[i].class =
                             ntohs(*(unsigned short *)(packet + pos + 2)))) {
+      SET_DNS_ERROR("Error parsing type or class in [%d] DNS answer", i);
       for (int j = 0; j < i; j++) {
         free(answers[j].name);
         free(answers[j].data);
@@ -263,6 +340,7 @@ int parse_dns_answers(const unsigned char *packet, DnsAnswer **_answers,
 
     if (data_len > 0) {
       if (pos + data_len > packet_size) {
+        SET_DNS_ERROR("Insufficient data for answer record [%d]", i);
         for (int j = 0; j < i; j++) {
           free(answers[j].name);
           free(answers[j].data);
@@ -278,6 +356,7 @@ int parse_dns_answers(const unsigned char *packet, DnsAnswer **_answers,
         if (!answers[i].data ||
             (pos = parse_soa_record(packet, packet_size, pos,
                                     (SOARecord *)answers[i].data)) < 0) {
+          SET_DNS_ERROR("Error parsing SOA record in answer [%d]", i);
           for (int j = 0; j < i; j++) {
             free(answers[j].name);
             free(answers[j].data);
@@ -296,6 +375,7 @@ int parse_dns_answers(const unsigned char *packet, DnsAnswer **_answers,
         if (!answers[i].data ||
             (pos = parse_mx_record(packet, packet_size, pos,
                                    (MXRecord *)answers[i].data)) < 0) {
+          SET_DNS_ERROR("Error parsing MX record in answer [%d]", i);
           for (int j = 0; j < i; j++) {
             free(answers[j].name);
             free(answers[j].data);
@@ -311,8 +391,9 @@ int parse_dns_answers(const unsigned char *packet, DnsAnswer **_answers,
       case DNS_TYPE_CNAME:
       case DNS_TYPE_NS:
       case DNS_TYPE_PTR:
-        if (pos = parse_domain_name(packet, packet_size, pos,
-                                    (char **)&answers[i].data) < 0) {
+        if ((pos = parse_domain_name(packet, packet_size, pos,
+                                     (char **)&answers[i].data)) < 0) {
+          SET_DNS_ERROR("Error parsing CNAME/NS/PTR record in answer [%d]", i);
           for (int j = 0; j < i; j++) {
             free(answers[j].name);
             free(answers[j].data);
@@ -326,6 +407,7 @@ int parse_dns_answers(const unsigned char *packet, DnsAnswer **_answers,
       default:
         answers[i].data = malloc(data_len);
         if (!answers[i].data) {
+          SET_DNS_ERROR("Memory allocation failed for answer data [%d]", i);
           for (int j = 0; j < i; j++) {
             free(answers[j].name);
             free(answers[j].data);
@@ -370,27 +452,41 @@ void free_dns_queries(DnsQuery *queries, const unsigned short count) {
 
 DnsPacket *parse_dns_packet(const unsigned char *packet,
                             const int packet_size) {
-  if (packet_size < sizeof(DnsHeader))
-    return NULL; // Пакет занадто малий, щоб бути дійсним
+  if (packet_size < sizeof(DnsHeader)) {
+    SET_DNS_ERROR("Packet size is too small");
+    return NULL;
+  }
 
   DnsHeader parsed_header;
 
-  if (parse_dns_header(packet, packet_size, &parsed_header) < 0)
-    return NULL; // Недійсний заголовок
+  if (parse_dns_header(packet, packet_size, &parsed_header) < 0) {
+    return NULL;
+  }
 
   DnsPacket *dns_packet = malloc(sizeof(DnsPacket));
 
-  if (!dns_packet)
-    return NULL; // Помилка виділення пам'яті
+  if (!dns_packet) {
+    SET_DNS_ERROR("Memory allocation failed");
+    return NULL;
+  }
 
   dns_packet->header = parsed_header;
-  int pos = sizeof(DnsHeader); // Початок після заголовка DNS
+  int pos = sizeof(DnsHeader);
 
   if (!parsed_header.qr) {
     if ((pos = parse_dns_queries(packet, &dns_packet->queries, packet_size, pos,
                                  dns_packet->header.q_count)) < 0) {
       free(dns_packet);
       return NULL;
+    }
+
+    if (dns_packet->header.add_count > 0) {
+      if ((pos = parse_dns_answers(packet, &dns_packet->additional, packet_size,
+                                   pos, dns_packet->header.add_count)) < 0) {
+        free_dns_queries(dns_packet->queries, dns_packet->header.q_count);
+        free(dns_packet);
+        return NULL;
+      }
     }
   } else {
     if (dns_packet->header.q_count > 0) {
@@ -426,14 +522,15 @@ DnsPacket *parse_dns_packet(const unsigned char *packet,
                                    pos, dns_packet->header.add_count)) < 0) {
         free_dns_queries(dns_packet->queries, dns_packet->header.q_count);
         free_dns_records(dns_packet->answers, dns_packet->header.ans_count);
-        free_dns_records(dns_packet->additional, dns_packet->header.add_count);
+        free_dns_records(dns_packet->authortative,
+                         dns_packet->header.auth_count);
         free(dns_packet);
         return NULL;
       }
     }
   }
 
-  return dns_packet; // Повернення розібраного DNS пакета
+  return dns_packet;
 }
 
 // Функція для звільнення пам'яті, виділеної під DnsPacket
@@ -517,24 +614,26 @@ void print_dns_packet(const DnsPacket *dns_packet) {
 
 int serialize_domain_name(const char *name, unsigned char *packet, int pos,
                           DomainLabelCacheEntry **domain_cache) {
-  if (!name || !packet || !domain_cache)
-    return -1; // Validate inputs
+  if (!name || !packet || !domain_cache) {
+    SET_DNS_ERROR("Invalid input pointers");
+    return -1;
+  }
 
   const char *ptr = name;
   int name_len = strlen(name);
   DomainLabelCacheEntry *entry;
   int original_pos = pos;
   int label_len = 0;
-  if (!name_len)
-    return -1;
 
   while (ptr + 1 < name + name_len) {
 
     HASH_FIND_STR(*domain_cache, ptr, entry);
     label_len = name_len - (ptr - name);
     if (entry) {
-      if (pos + sizeof(unsigned short) >= MAX_DNS_PACKET_SIZE)
+      if (pos + sizeof(unsigned short) >= MAX_DNS_PACKET_SIZE) {
+        SET_DNS_ERROR("Packet size exceeded during domain name serialization");
         return -1;
+      }
 
       *(unsigned short *)(packet + pos) = htons(entry->position | 0xC000);
       return pos + sizeof(unsigned short);
@@ -542,8 +641,10 @@ int serialize_domain_name(const char *name, unsigned char *packet, int pos,
       const char *dot = strchr(ptr, '.');
       if (dot)
         label_len = dot - ptr;
-      if (pos + label_len + 1 >= MAX_DNS_PACKET_SIZE)
+      if (pos + label_len + 1 >= MAX_DNS_PACKET_SIZE) {
+        SET_DNS_ERROR("Packet size exceeded during domain name serialization");
         return -1;
+      }
       packet[pos++] = (unsigned char)label_len;
       memcpy(&packet[pos], ptr, label_len);
       pos += label_len;
@@ -552,8 +653,10 @@ int serialize_domain_name(const char *name, unsigned char *packet, int pos,
     HASH_FIND_STR(*domain_cache, ptr, entry);
     if (!entry) {
       entry = malloc(sizeof(DomainLabelCacheEntry));
-      if (!entry)
+      if (!entry) {
+        SET_DNS_ERROR("Memory allocation failed");
         return -1;
+      }
 
       strcpy(entry->key, ptr);
       entry->position = original_pos;
@@ -590,21 +693,22 @@ DnsPacket *create_empty_dns_packet_copy(const DnsPacket *packet) {
 
 int serialize_dns_header(const DnsHeader *header, unsigned char *packet,
                          int pos) {
-  if (!header || !packet)
-    return -1; // Validate inputs
+  if (!header || !packet) {
+    SET_DNS_ERROR("Invalid input pointers");
+    return -1;
+  }
 
   DnsHeader temp_header = *header;
 
-  // Convert values to network byte order
   temp_header.id = htons(temp_header.id);
   temp_header.q_count = htons(temp_header.q_count);
   temp_header.ans_count = htons(temp_header.ans_count);
   temp_header.auth_count = htons(temp_header.auth_count);
   temp_header.add_count = htons(temp_header.add_count);
 
-  // Copy the header to the packet
   if (pos + sizeof(DnsHeader) > MAX_DNS_PACKET_SIZE) {
-    return -1; // Not enough space in packet
+    SET_DNS_ERROR("Packet size exceeded during header serialization");
+    return -1;
   }
   memcpy(&packet[pos], &temp_header, sizeof(DnsHeader));
   return pos + sizeof(DnsHeader);
@@ -613,20 +717,20 @@ int serialize_dns_header(const DnsHeader *header, unsigned char *packet,
 int serialize_dns_queries(const DnsQuery *queries, unsigned short count,
                           unsigned char *packet, int pos,
                           DomainLabelCacheEntry **domain_cache) {
-  if (!queries || !packet)
+  if (!queries || !packet || !domain_cache) {
+    SET_DNS_ERROR("Invalid input pointers");
     return -1;
+  }
 
   for (int i = 0; i < count; i++) {
-    // Serialize the domain name
     pos = serialize_domain_name(queries[i].name, packet, pos, domain_cache);
     if (pos < 0) {
-      return -1; // Error during serialization
+      return -1;
     }
 
-    // Serialize the query type and class
     if (pos + 4 > MAX_DNS_PACKET_SIZE) {
-
-      return -1; // Not enough space in packet
+      SET_DNS_ERROR("Packet size exceeded during query serialization");
+      return -1;
     }
     *(unsigned short *)&packet[pos] = htons(queries[i].ques.qtype);
     *(unsigned short *)&packet[pos + 2] = htons(queries[i].ques.qclass);
@@ -638,20 +742,26 @@ int serialize_dns_queries(const DnsQuery *queries, unsigned short count,
 
 int serialize_soa_record(const SOARecord *soa, unsigned char *packet, int pos,
                          DomainLabelCacheEntry **domain_cache) {
-  // Write Primary NS
-  pos = serialize_domain_name(soa->primary_ns, packet, pos, domain_cache);
-  if (pos < 0)
+  if (!soa || !packet || !domain_cache) {
+    SET_DNS_ERROR("Invalid input pointers");
     return -1;
+  }
 
-  // Write Responsible Email
+  pos = serialize_domain_name(soa->primary_ns, packet, pos, domain_cache);
+  if (pos < 0) {
+    return -1;
+  }
+
   pos =
       serialize_domain_name(soa->responsible_email, packet, pos, domain_cache);
-  if (pos < 0)
+  if (pos < 0) {
     return -1;
+  }
 
-  // Write 32-bit fields in network byte order
-  if (pos + 20 > MAX_DNS_PACKET_SIZE)
-    return -1; // Ensure space for 5 * 4-byte fields
+  if (pos + 20 > MAX_DNS_PACKET_SIZE) {
+    SET_DNS_ERROR("Packet size exceeded during SOA record serialization");
+    return -1;
+  }
 
   *(uint32_t *)(packet + pos) = htonl(soa->serial);
   pos += 4;
@@ -664,41 +774,49 @@ int serialize_soa_record(const SOARecord *soa, unsigned char *packet, int pos,
   *(uint32_t *)(packet + pos) = htonl(soa->minimum_ttl);
   pos += 4;
 
-  return pos; // Return the new position after writing
+  return pos;
 }
 
 int serialize_mx_record(const MXRecord *mx, unsigned char *packet, int pos,
                         DomainLabelCacheEntry **domain_cache) {
-  // Write Preference
-  if (pos + 2 > MAX_DNS_PACKET_SIZE)
-    return -1; // Ensure space for 2-byte field
+  if (!mx || !packet || !domain_cache) {
+    SET_DNS_ERROR("Invalid input pointers");
+    return -1;
+  }
+
+  if (pos + 2 > MAX_DNS_PACKET_SIZE) {
+    SET_DNS_ERROR("Packet size exceeded during MX record serialization");
+    return -1;
+  }
 
   *(uint16_t *)(packet + pos) = htons(mx->preference);
   pos += 2;
 
-  // Write Mail Exchange Domain Name
   pos = serialize_domain_name(mx->primary_ns, packet, pos, domain_cache);
-  if (pos < 0)
+  if (pos < 0) {
     return -1;
+  }
 
-  return pos; // Return the new position after writing
+  return pos;
 }
 
 int serialize_dns_answers(const DnsAnswer *answers, unsigned short count,
                           unsigned char *packet, int pos,
                           DomainLabelCacheEntry **domain_cache) {
-  if (!answers || !packet)
-    return -1; // Validate inputs
+  if (!answers || !packet || !domain_cache) {
+    SET_DNS_ERROR("Invalid input pointers");
+    return -1;
+  }
+
   for (int i = 0; i < count; i++) {
-    // Serialize the domain name
     pos = serialize_domain_name(answers[i].name, packet, pos, domain_cache);
     if (pos < 0) {
-      return -1; // Error during serialization
+      return -1;
     }
 
-    // Serialize type, class, TTL, and data length
     if (pos + 10 > MAX_DNS_PACKET_SIZE) {
-      return -1; // Not enough space in packet
+      SET_DNS_ERROR("Packet size exceeded during answer serialization");
+      return -1;
     }
     *(unsigned short *)&packet[pos] = htons(answers[i].type);
     *(unsigned short *)&packet[pos + 2] = htons(answers[i].class);
@@ -706,7 +824,7 @@ int serialize_dns_answers(const DnsAnswer *answers, unsigned short count,
     *(unsigned short *)&packet[pos + 8] = htons(answers[i].data_len);
 
     pos += 10;
-    // Copy the answer data
+
     if (answers[i].data_len > 0) {
       switch (answers[i].type) {
       case DNS_TYPE_SOA: {
@@ -714,8 +832,8 @@ int serialize_dns_answers(const DnsAnswer *answers, unsigned short count,
         pos = serialize_soa_record((const SOARecord *)answers[i].data, packet,
                                    pos, domain_cache);
 
-        if (data_len_pos + 2 + 10 > MAX_DNS_PACKET_SIZE) {
-          return -1; // Not enough space in packet
+        if (pos < 0 || data_len_pos + 2 + 10 > MAX_DNS_PACKET_SIZE) {
+          return -1;
         }
         *(unsigned short *)&packet[data_len_pos] =
             htons(pos - (data_len_pos + 2));
@@ -724,9 +842,8 @@ int serialize_dns_answers(const DnsAnswer *answers, unsigned short count,
         int data_len_pos = pos - 2;
         pos = serialize_mx_record((const MXRecord *)answers[i].data, packet,
                                   pos, domain_cache);
-
-        if (data_len_pos + 2 + 10 > MAX_DNS_PACKET_SIZE) {
-          return -1; // Not enough space in packet
+        if (pos < 0 || data_len_pos + 2 + 10 > MAX_DNS_PACKET_SIZE) {
+          return -1;
         }
         *(unsigned short *)&packet[data_len_pos] =
             htons(pos - (data_len_pos + 2));
@@ -736,15 +853,17 @@ int serialize_dns_answers(const DnsAnswer *answers, unsigned short count,
       case DNS_TYPE_PTR: {
         int data_len_pos = pos - 2;
         pos = serialize_domain_name(answers[i].data, packet, pos, domain_cache);
-        if (data_len_pos + 2 + 10 > MAX_DNS_PACKET_SIZE) {
-          return -1; // Not enough space in packet
+        if (pos < 0 || data_len_pos + 2 + 10 > MAX_DNS_PACKET_SIZE) {
+          return -1;
         }
         *(unsigned short *)&packet[data_len_pos] =
             htons(pos - (data_len_pos + 2));
       } break;
       default:
         if (pos + answers[i].data_len > MAX_DNS_PACKET_SIZE) {
-          return -1; // Not enough space in packet
+          SET_DNS_ERROR(
+              "Packet size exceeded during answer data serialization");
+          return -1;
         }
         memcpy(&packet[pos], answers[i].data, answers[i].data_len);
         pos += answers[i].data_len;
@@ -756,24 +875,25 @@ int serialize_dns_answers(const DnsAnswer *answers, unsigned short count,
 }
 
 int serialize_dns_packet(const DnsPacket *dns_packet, unsigned char *packet) {
-  if (!dns_packet || !packet)
-    return -1; // Validate inputs
+  if (!dns_packet || !packet) {
+    SET_DNS_ERROR("Invalid input pointers");
+    return -1;
+  }
 
   int pos = 0;
   DomainLabelCacheEntry *domain_cache = NULL;
 
-  // Serialize the DNS header
   pos = serialize_dns_header(&dns_packet->header, packet, pos);
   if (pos < 0) {
-    return -1; // Error during serialization
+    return -1;
   }
 
-  // Serialize queries if it's a query packet
   if (!dns_packet->header.qr) {
     pos = serialize_dns_queries(dns_packet->queries, dns_packet->header.q_count,
                                 packet, pos, &domain_cache);
     if (pos < 0) {
-      return -1; // Error during serialization
+      free_domain_cache(&domain_cache);
+      return -1;
     }
   } else {
     if (dns_packet->header.q_count > 0) {
@@ -782,7 +902,7 @@ int serialize_dns_packet(const DnsPacket *dns_packet, unsigned char *packet) {
                                 packet, pos, &domain_cache);
       if (pos < 0) {
         free_domain_cache(&domain_cache);
-        return -1; // Error during serialization
+        return -1;
       }
     }
 
@@ -792,7 +912,7 @@ int serialize_dns_packet(const DnsPacket *dns_packet, unsigned char *packet) {
                                   &domain_cache);
       if (pos < 0) {
         free_domain_cache(&domain_cache);
-        return -1; // Error during serialization
+        return -1;
       }
     }
 
@@ -802,7 +922,7 @@ int serialize_dns_packet(const DnsPacket *dns_packet, unsigned char *packet) {
                                   &domain_cache);
       if (pos < 0) {
         free_domain_cache(&domain_cache);
-        return -1; // Error during serialization
+        return -1;
       }
     }
 
@@ -812,11 +932,11 @@ int serialize_dns_packet(const DnsPacket *dns_packet, unsigned char *packet) {
                                   &domain_cache);
       if (pos < 0) {
         free_domain_cache(&domain_cache);
-        return -1; // Error during serialization
+        return -1;
       }
     }
   }
 
   free_domain_cache(&domain_cache);
-  return pos; // Return the final position (size of the packet)
+  return pos;
 }
